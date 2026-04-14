@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E0F7FA"
+    android:padding="30dp">
+
+    <View
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentLeft="true"
+        android:layout_marginLeft="-100dp"
+        android:layout_marginTop="-100dp"
+        android:background="@drawable/circle_shape"
+        android:alpha="0.1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvWelcome"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="مرحباً بك"
+            android:textColor="#006064"
+            android:textSize="45sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"/>
+
+        <TextView
+            android:id="@+id/tvAppName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="نظام إدارة الشكاوى "
+            android:textColor="#00838F"
+            android:textSize="22sp"
+            android:letterSpacing="0.05"
+            android:fontFamily="sans-serif-medium"/>
+
+        <View
+            android:layout_width="80dp"
+            android:layout_height="4dp"
+            android:layout_marginTop="20dp"
+            android:background="#00ACC1" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:text="نحن هنا لنستمع إليك..\nساهم في تطوير الخدمات بتقديم بلاغك الآن"
+            android:textColor="#546E7A"
+            android:textSize="16sp"
+            android:lineSpacingExtra="5dp"/>
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnNextHome"
+        android:layout_width="match_parent"
+        android:layout_height="65dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="40dp"
+        android:backgroundTint="#00838F"
+        android:text="ابدأ الأن"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:cornerRadius="32dp"
+        app:elevation="12dp" />
+
+</RelativeLayout>
