@@ -10,22 +10,30 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('name'); // دمجنا الاسم هنا ليتوافق مع الموديل
             $table->string('email')->unique()->nullable();
             $table->string('phone')->unique();
             $table->date('birthdate')->nullable();
             $table->string('password');
-            $table->boolean('verification')->default(false);
+            
+            // نظام التحقق
+            $table->boolean('is_verified')->default(false);
             $table->string('verification_code')->nullable();
             $table->timestamp('verification_expires_at')->nullable();
+            
+            // الربط مع الجداول الأخرى
             $table->unsignedBigInteger('role_id')->nullable();
             $table->unsignedBigInteger('authority_id')->nullable();
             $table->unsignedBigInteger('department_id')->nullable();
+            
+            // إحصائيات وحالة الحساب
             $table->integer('score')->default(0);
             $table->boolean('is_active')->default(true);
+            
             $table->rememberToken();
             $table->timestamps();
 
+            // الفهارس لتسريع البحث
             $table->index('role_id');
             $table->index('authority_id');
             $table->index('department_id');

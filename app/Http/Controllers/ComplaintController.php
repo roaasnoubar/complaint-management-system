@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Complain;
+use App\Models\Complaint;
 use App\Models\Attachment;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -20,14 +20,14 @@ class ComplaintController extends Controller
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,mp4|max:20480',
         ]);
 
-        $complain = Complain::create([
+        $complaint = Complaint::create([
             'user_id'        => $request->user()->id,
             'auth_id'        => $validated['auth_id'],
             'department_id'  => $validated['department_id'],
             'title'          => $validated['title'],
             'description'    => $validated['description'],
-            'status'         => Complain::STATUS_PENDING,
-            'assigned_level' => Complain::LEVEL_EMPLOYEE,
+            'status'         => Complaint::STATUS_PENDING,
+            'assigned_level' => Complaint::LEVEL_EMPLOYEE,
             'assigned_at'    => now(),
             'is_valid'       => true,
         ]);
@@ -36,49 +36,30 @@ class ComplaintController extends Controller
             foreach ($request->file('attachments') as $file) {
                 if ($file->isValid()) {
                     $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                    $path     = $file->storeAs('complains/' . $complain->id, $filename, 'public');
+                    $path     = $file->storeAs('complaints/' . $complaint->id, $filename, 'public');
 
                     Attachment::create([
-                        'complain_id' => $complain->id,
-                        'user_id'     => $request->user()->id,
-                        'file_path'   => $path,
-                        'file_type'   => $file->getClientOriginalExtension(),
+                        'complaint_id' => $complaint->id,
+                        'user_id'      => $request->user()->id,
+                        'file_path'    => $path,
+                        'file_type'    => $file->getClientOriginalExtension(),
                     ]);
                 }
             }
         }
 
-        $complain->load('attachments');
+        $complaint->load('attachments');
 
         return response()->json([
             'success' => true,
-            'message' => 'Complain submitted successfully.',
-            'data'    => [
-                'id'               => $complain->id,
-                'complain_number'  => $complain->complain_number,
-                'title'            => $complain->title,
-                'description'      => $complain->description,
-                'status'           => $complain->status,
-                'is_valid'         => $complain->is_valid,
-                'assigned_level'   => $complain->assigned_level,
-                'level_name'       => $complain->level_name,
-                'auth_id'          => $complain->auth_id,
-                'department_id'    => $complain->department_id,
-                'created_at'       => $complain->created_at,
-                'attachments'      => $complain->attachments->map(function ($attachment) {
-                    return [
-                        'id'        => $attachment->id,
-                        'file_path' => asset('storage/' . $attachment->file_path),
-                        'file_type' => $attachment->file_type,
-                    ];
-                }),
-            ],
+            'message' => 'Complaint submitted successfully.',
+            'data'    => $complaint,
         ], 201);
     }
 
     public function getComplaints(Request $request): JsonResponse
     {
-        $query = Complain::with(['user', 'authority', 'department', 'attachments']);
+        $query = Complaint::with(['user', 'authority', 'department', 'attachments']);
 
         if ($request->has('auth_id')) {
             $query->where('auth_id', $request->auth_id);
@@ -90,95 +71,79 @@ class ComplaintController extends Controller
             $query->where('status', $request->status);
         }
 
-        $complains = $query->latest()->paginate(10);
-        $complains->getCollection()->transform(function ($complain) {
-            $complain->can_escalate = $complain->canEscalate();
-            $complain->level_name   = $complain->level_name;
-            return $complain;
+        $complaints = $query->latest()->paginate(10);
+        
+        $complaints->getCollection()->transform(function ($complaint) {
+            $complaint->can_escalate = $complaint->canEscalate();
+            $complaint->level_name   = $complaint->level_name;
+            return $complaint;
         });
 
-        return response()->json(['success' => true, 'data' => $complains], 200);
+        return response()->json(['success' => true, 'data' => $complaints], 200);
     }
 
     public function getMyComplaints(Request $request): JsonResponse
     {
-        $complains = Complain::with(['authority', 'department', 'attachments'])
+        $complaints = Complaint::with(['authority', 'department', 'attachments'])
             ->where('user_id', $request->user()->id)
             ->latest()
             ->paginate(10);
 
-        $complains->getCollection()->transform(function ($complain) {
-            $complain->can_escalate = $complain->canEscalate();
-            $complain->level_name   = $complain->level_name;
-            return $complain;
+        $complaints->getCollection()->transform(function ($complaint) {
+            $complaint->can_escalate = $complaint->canEscalate();
+            $complaint->level_name   = $complaint->level_name;
+            return $complaint;
         });
 
-        return response()->json(['success' => true, 'data' => $complains], 200);
+        return response()->json(['success' => true, 'data' => $complaints], 200);
     }
 
     public function updateComplaintStatus(Request $request, $id): JsonResponse
     {
-        $complain          = Complain::findOrFail($id);
-        $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
+        $complaint         = Complaint::findOrFail($id);
+        $allowedNextStatus = Complaint::STATUS_TRANSITIONS[$complaint->status] ?? null;
 
         if (!$allowedNextStatus) {
-            return response()->json(['success' => false, 'message' => 'Complain is already resolved.'], 422);
+            return response()->json(['success' => false, 'message' => 'Complaint is already resolved.'], 422);
         }
 
-        $complain->status = $allowedNextStatus;
-        if ($allowedNextStatus === Complain::STATUS_RESOLVED) {
-            $complain->resolved_at = now();
+        $complaint->status = $allowedNextStatus;
+        if ($allowedNextStatus === Complaint::STATUS_RESOLVED) {
+            $complaint->resolved_at = now();
         }
-        $complain->save();
+        $complaint->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Status updated to ' . $allowedNextStatus,
-            'data'    => [
-                'id'              => $complain->id,
-                'complain_number' => $complain->complain_number,
-                'status'          => $complain->status,
-                'resolved_at'     => $complain->resolved_at,
-            ],
+            'data'    => $complaint,
         ], 200);
     }
 
     public function escalateComplaint(Request $request, $id): JsonResponse
     {
-        $complain = Complain::findOrFail($id);
+        $complaint = Complaint::findOrFail($id);
 
-        if ($complain->user_id !== $request->user()->id) {
+        if ($complaint->user_id !== $request->user()->id) {
             return response()->json(['success' => false, 'message' => 'Not authorized.'], 403);
         }
 
-        if (!$complain->canEscalate()) {
-            $daysLeft = Complain::ESCALATION_DAYS - now()->diffInDays($complain->assigned_at ?? $complain->created_at);
+        if (!$complaint->canEscalate()) {
+            $daysLeft = Complaint::ESCALATION_DAYS - now()->diffInDays($complaint->assigned_at ?? $complaint->created_at);
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot escalate yet. Wait ' . max(0, $daysLeft) . ' more day(s).',
-                'data'    => [
-                    'complain_number' => $complain->complain_number,
-                    'current_level'   => $complain->assigned_level,
-                    'level_name'      => $complain->level_name,
-                    'days_left'       => max(0, $daysLeft),
-                ],
+                'message' => 'Cannot escalate yet. Wait ' . max(0, $daysLeft) . ' day(s).',
             ], 422);
         }
 
-        $previousLevel           = $complain->assigned_level;
-        $complain->assigned_level = $complain->assigned_level - 1;
-        $complain->assigned_at    = now();
-        $complain->save();
+        $complaint->assigned_level = $complaint->assigned_level - 1;
+        $complaint->assigned_at    = now();
+        $complaint->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'Escalated from Level ' . $previousLevel . ' to Level ' . $complain->assigned_level,
-            'data'    => [
-                'complain_number' => $complain->complain_number,
-                'previous_level'  => $previousLevel,
-                'current_level'   => $complain->assigned_level,
-                'level_name'      => $complain->level_name,
-            ],
+            'message' => 'Escalated successfully to Level ' . $complaint->assigned_level,
+            'data'    => $complaint,
         ], 200);
     }
 }

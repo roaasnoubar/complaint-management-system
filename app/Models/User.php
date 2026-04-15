@@ -19,12 +19,12 @@ class User extends Authenticatable
         'phone',
         'birthdate',
         'password',
-        'verification',
-        'verification_code',
-        'verification_expires_at',
         'role_id',
         'authority_id',
         'department_id',
+        'is_verified',
+        'verification_code',
+        'verification_expires_at',
         'score',
         'is_active',
     ];
@@ -36,37 +36,41 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'verification'            => 'boolean',
+        'is_verified'             => 'boolean',
         'is_active'               => 'boolean',
         'verification_expires_at' => 'datetime',
         'birthdate'               => 'date',
     ];
-
-    public function getBirthdateAttribute($value)
-    {
-        return $value ? date('Y-m-d', strtotime($value)) : null;
-    }
 
     public function setPasswordAttribute(string $value): void
     {
         $this->attributes['password'] = bcrypt($value);
     }
 
+    // التحقق من الصلاحيات
     public function isAdmin(): bool
     {
-        return $this->role?->name === Role::ADMIN;
+        return $this->role?->name === 'admin';
     }
 
     public function isEmployee(): bool
     {
-        return $this->role?->name === Role::EMPLOYEE;
+        return $this->role?->name === 'employee';
     }
 
     public function isUser(): bool
     {
-        return $this->role?->name === Role::USER;
+        return $this->role?->name === 'user';
     }
 
+    public function hasPermission(string $permissionName): bool
+    {
+        return $this->role?->permissions()
+            ->where('name', $permissionName)
+            ->exists() ?? false;
+    }
+
+    // العلاقات (Relationships)
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
@@ -82,9 +86,9 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class);
     }
 
-    public function complains(): HasMany
+    public function complaints(): HasMany
     {
-        return $this->hasMany(Complain::class);
+        return $this->hasMany(Complaint::class);
     }
 
     public function attachments(): HasMany
@@ -99,11 +103,11 @@ class User extends Authenticatable
 
     public function sentMessages(): HasMany
     {
-        return $this->hasMany(CantMessage::class, 'sender_id');
+        return $this->hasMany(ChatMessage::class, 'sender_id');
     }
 
-    public function rattings(): HasMany
+    public function ratings(): HasMany
     {
-        return $this->hasMany(Ratting::class);
+        return $this->hasMany(Rating::class);
     }
 }
