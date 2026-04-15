@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Role extends Model
+{
+    protected $fillable = [
+        'name',
+        'level',
+    ];
+
+    protected $casts = [
+        'level' => 'integer',
+    ];
+
+    const ADMIN    = 'admin';
+    const EMPLOYEE = 'employee';
+    const USER     = 'user';
+
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class, 'role_permission')
+            ->withTimestamps();
+    }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class);
+    }
+}
