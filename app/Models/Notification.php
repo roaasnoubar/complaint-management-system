@@ -8,15 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Notification extends Model
 {
     protected $fillable = [
-        'user_id',
-        'title',
-        'message',
+        'user_id', 
+        'title', 
+        'message', 
         'type',
-        'is_read',
+        'data', 
+        'is_read'
     ];
-
+    
     protected $casts = [
-        'is_read' => 'boolean',
+        'data' => 'array',
     ];
 
     // Notification types as constants
@@ -29,7 +30,7 @@ class Notification extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id', 'user_id');
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
     public function scopeUnread($query)

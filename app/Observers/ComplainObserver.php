@@ -2,7 +2,6 @@
 
 namespace App\Observers;
 
-use App\Models\Complain;
 use App\Models\User;
 use App\Services\NotificationService;
 
@@ -14,32 +13,34 @@ class ComplainObserver
      * Triggered when a complaint is first created.
      * Notifies all employees in the target department.
      */
-    public function created(Complain $complain): void
+    public function created($complain): void
     {
         // Notify all employees in the assigned department
-        $employees = User::where('department_id', $complain->department_id)
-            ->where('user_id', '!=', $complain->user_id)
+        $employees = User::query()
+            ->where('department_id', $complain->department_id)
+            ->where('id', '!=', $complain->user_id)
+            ->whereHas('role', fn ($q) => $q->where('name', 'employee'))
             ->get();
 
         foreach ($employees as $employee) {
-            $this->notificationService->complaintSubmitted(
-                $employee->user_id,
-                $complain->title
+            $this->notificationService->complaintAssigned(
+                $employee->id,
+                $complain->title,
+                $complain->department->name ?? 'the department'
             );
         }
 
-        // Notify the submitter that their complaint was received
-        $this->notificationService->complaintAssigned(
+        // Notify the submitter that their complaint was submitted
+        $this->notificationService->complaintSubmitted(
             $complain->user_id,
-            $complain->title,
-            $complain->department->name ?? 'the department'
+            $complain->title
         );
     }
 
     /**
      * Triggered when complaint fields change (status, assigned_level).
      */
-    public function updated(Complain $complain): void
+    public function updated($complain): void
     {
         // Status changed
         if ($complain->isDirty('status')) {
@@ -65,8 +66,9 @@ class ComplainObserver
         if ($complain->isDirty('assigned_level')) {
             $level = $complain->assigned_level;
             $escalatedTo = match ($level) {
-                2       => 'Department Head',
-                3       => 'Authority Manager',
+                1       => 'Head of Organization',
+                2       => 'Department Manager',
+                3       => 'Employee',
                 default => 'a higher authority',
             };
 

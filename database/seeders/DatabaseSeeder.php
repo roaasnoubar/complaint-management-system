@@ -18,12 +18,12 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(ERDDatabaseSeeder::class);
 
-        $citizenRole = Role::where('type', 'citizen')->first();
+        $userRole = Role::where('name', 'user')->first();
 
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
-            'role_id' => $citizenRole?->id,
+            'role_id' => $userRole?->id,
         ]);
     }
 }

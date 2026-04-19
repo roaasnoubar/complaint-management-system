@@ -2,78 +2,106 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Complaint;
+use App\Models\Complain; 
 use App\Models\Attachment;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class ComplaintController extends Controller
 {
-    public function submitComplaint(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'auth_id'       => 'required|exists:authorities,id',
-            'department_id' => 'required|exists:departments,id',
-            'title'         => 'required|string|max:255',
-            'description'   => 'required|string',
-            'attachments'   => 'nullable|array',
-            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,mp4|max:20480',
-        ]);
+    /**
+     * تقديم شكوى جديدة - تم إصلاح منطق حفظ المرفقات لملء المصفوفة
+     */
+    public function submitComplaint(Request $request): \Illuminate\Http\JsonResponse
+{
+    // --- (بداية الكود التشخيصي) ---
+    // إذا لم يجد السيرفر أي ملفات، سيتوقف هنا ويعطيكِ التفاصيل
+    if (!$request->hasFile('attachments') && count($request->allFiles()) === 0) {
+        return response()->json([
+            'error' => 'السيرفر لم يستلم أي ملفات',
+            'hint' => 'تأكدي من اختيار File في بوستمان وحذف Content-Type من الهيدرز',
+            'request_all' => $request->all(), 
+            'files_raw_php' => $_FILES, // هذا سيكشف لنا إذا كان PHP نفسه يرى الملف أم لا
+        ], 400);
+    }
+    // --- (نهاية الكود التشخيصي) ---
 
-        $complaint = Complaint::create([
-            'user_id'        => $request->user()->id,
-            'auth_id'        => $validated['auth_id'],
-            'department_id'  => $validated['department_id'],
-            'title'          => $validated['title'],
-            'description'    => $validated['description'],
-            'status'         => Complaint::STATUS_PENDING,
-            'assigned_level' => Complaint::LEVEL_EMPLOYEE,
+    // 1. التحقق من الحقول
+    $request->validate([
+        'auth_id'       => 'required',
+        'department_id' => 'required',
+        'title'         => 'required',
+        'description'   => 'required',
+    ]);
+
+    return \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
+        
+        // 2. إنشاء الشكوى
+        $complaint = \App\Models\Complain::create([
+            'auth_id'        => $request->auth_id,
+            'department_id'  => $request->department_id,
+            'title'          => $request->title,
+            'description'    => $request->description,
+            'user_id'        => auth()->id() ?? 10,
+            'priority'       => 'High',
+            'status'         => 'Pending',
+            'assigned_level' => 3,
             'assigned_at'    => now(),
             'is_valid'       => true,
         ]);
 
-        if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $file) {
-                if ($file->isValid()) {
-                    $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                    $path     = $file->storeAs('complaints/' . $complaint->id, $filename, 'public');
-
-                    Attachment::create([
-                        'complaint_id' => $complaint->id,
-                        'user_id'      => $request->user()->id,
-                        'file_path'    => $path,
-                        'file_type'    => $file->getClientOriginalExtension(),
+        // 3. رفع الملفات
+        $allFiles = $request->allFiles(); 
+        foreach ($allFiles as $fileGroup) {
+            $files = is_array($fileGroup) ? $fileGroup : [$fileGroup];
+            foreach ($files as $file) {
+                if ($file instanceof \Illuminate\Http\UploadedFile) {
+                    $path = $file->store('complaints/' . $complaint->id, 'public');
+                    \App\Models\Attachment::create([
+                        'complain_id' => $complaint->id,
+                        'user_id'     => auth()->id() ?? 10,
+                        'file_path'   => $path,
+                        'file_type'   => $file->getClientOriginalExtension(),
                     ]);
                 }
             }
         }
 
-        $complaint->load('attachments');
+        $attachmentsFinal = \App\Models\Attachment::where('complain_id', $complaint->id)->get();
+        $complaint->setRelation('attachments', $attachmentsFinal);
 
         return response()->json([
             'success' => true,
-            'message' => 'Complaint submitted successfully.',
-            'data'    => $complaint,
+            'message' => 'تم الحفظ بنجاح',
+            'data' => $complaint,
         ], 201);
-    }
-
+    });
+}
+    /**
+     * جلب كافة الشكاوى للموظفين مع المرفقات
+     */
     public function getComplaints(Request $request): JsonResponse
     {
-        $query = Complaint::with(['user', 'authority', 'department', 'attachments']);
+        $query = Complain::with(['user', 'authority', 'department', 'attachments']);
 
-        if ($request->has('auth_id')) {
-            $query->where('auth_id', $request->auth_id);
-        }
-        if ($request->has('department_id')) {
-            $query->where('department_id', $request->department_id);
-        }
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
+        // فلاتر اختيارية
+        if ($request->filled('auth_id')) $query->where('auth_id', $request->auth_id);
+        if ($request->filled('department_id')) $query->where('department_id', $request->department_id);
+        if ($request->filled('status')) $query->where('status', $request->status);
+        if ($request->filled('priority')) $query->where('priority', $request->priority);
 
-        $complaints = $query->latest()->paginate(10);
+        $complaints = $query->orderByRaw("FIELD(priority, 'High', 'Medium', 'Low')")
+                            ->latest()
+                            ->paginate(10);
         
         $complaints->getCollection()->transform(function ($complaint) {
+            $complaint->attachments->map(function ($attachment) {
+                $attachment->full_url = asset('storage/' . $attachment->file_path);
+                return $attachment;
+            });
             $complaint->can_escalate = $complaint->canEscalate();
             $complaint->level_name   = $complaint->level_name;
             return $complaint;
@@ -82,14 +110,21 @@ class ComplaintController extends Controller
         return response()->json(['success' => true, 'data' => $complaints], 200);
     }
 
+    /**
+     * جلب شكاوى المستخدم الحالي مع المرفقات
+     */
     public function getMyComplaints(Request $request): JsonResponse
     {
-        $complaints = Complaint::with(['authority', 'department', 'attachments'])
+        $complaints = Complain::with(['authority', 'department', 'attachments'])
             ->where('user_id', $request->user()->id)
             ->latest()
             ->paginate(10);
 
         $complaints->getCollection()->transform(function ($complaint) {
+            $complaint->attachments->map(function ($attachment) {
+                $attachment->full_url = asset('storage/' . $attachment->file_path);
+                return $attachment;
+            });
             $complaint->can_escalate = $complaint->canEscalate();
             $complaint->level_name   = $complaint->level_name;
             return $complaint;
@@ -98,52 +133,58 @@ class ComplaintController extends Controller
         return response()->json(['success' => true, 'data' => $complaints], 200);
     }
 
+    /**
+     * تحديث حالة الشكوى
+     */
     public function updateComplaintStatus(Request $request, $id): JsonResponse
     {
-        $complaint         = Complaint::findOrFail($id);
-        $allowedNextStatus = Complaint::STATUS_TRANSITIONS[$complaint->status] ?? null;
+        $complaint = Complain::findOrFail($id);
+        $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complaint->status] ?? null;
 
         if (!$allowedNextStatus) {
-            return response()->json(['success' => false, 'message' => 'Complaint is already resolved.'], 422);
+            return response()->json(['success' => false, 'message' => 'الشكوى مكتملة بالفعل.'], 422);
         }
 
         $complaint->status = $allowedNextStatus;
-        if ($allowedNextStatus === Complaint::STATUS_RESOLVED) {
+        if ($allowedNextStatus === Complain::STATUS_RESOLVED) {
             $complaint->resolved_at = now();
         }
         $complaint->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'Status updated to ' . $allowedNextStatus,
-            'data'    => $complaint,
+            'message' => 'تم تحديث الحالة بنجاح.',
+            'data'    => $complaint->load('attachments'),
         ], 200);
     }
 
+    /**
+     * تصعيد الشكوى
+     */
     public function escalateComplaint(Request $request, $id): JsonResponse
     {
-        $complaint = Complaint::findOrFail($id);
+        $complaint = Complain::findOrFail($id);
 
         if ($complaint->user_id !== $request->user()->id) {
-            return response()->json(['success' => false, 'message' => 'Not authorized.'], 403);
+            return response()->json(['success' => false, 'message' => 'غير مصرح لك بالعملية.'], 403);
         }
 
         if (!$complaint->canEscalate()) {
-            $daysLeft = Complaint::ESCALATION_DAYS - now()->diffInDays($complaint->assigned_at ?? $complaint->created_at);
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot escalate yet. Wait ' . max(0, $daysLeft) . ' day(s).',
-            ], 422);
+            return response()->json(['success' => false, 'message' => 'لا يمكن التصعيد حالياً.'], 422);
         }
 
-        $complaint->assigned_level = $complaint->assigned_level - 1;
-        $complaint->assigned_at    = now();
-        $complaint->save();
+        if ($complaint->assigned_level > 1) {
+            $complaint->assigned_level = $complaint->assigned_level - 1;
+            $complaint->assigned_at    = now();
+            $complaint->save();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Escalated successfully to Level ' . $complaint->assigned_level,
-            'data'    => $complaint,
-        ], 200);
+            return response()->json([
+                'success' => true,
+                'message' => 'تم التصعيد بنجاح إلى ' . $complaint->level_name,
+                'data'    => $complaint,
+            ], 200);
+        }
+
+        return response()->json(['success' => false, 'message' => 'وصلت الشكوى لأعلى مستوى.'], 422);
     }
 }

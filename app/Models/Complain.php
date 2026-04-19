@@ -16,6 +16,7 @@ class Complain extends Model
         'user_id',
         'auth_id',
         'department_id',
+        'priority',
         'current_department_id',
         'title',
         'description',

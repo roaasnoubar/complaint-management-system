@@ -13,7 +13,16 @@ class Attachment extends Model
         'file_path',
         'file_type',
     ];
+    protected $appends = ['full_url'];
 
+    // تعريف كيف يتم بناء هذا الرابط
+    public function getFullUrlAttribute()
+    {
+        if ($this->file_path) {
+            return asset('storage/' . $this->file_path);
+        }
+        return null;
+    }
     public function complain(): BelongsTo
     {
         return $this->belongsTo(Complain::class, 'complain_id');

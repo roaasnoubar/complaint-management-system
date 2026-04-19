@@ -17,6 +17,7 @@ class NotificationService
             'title'   => $title,
             'message' => $message,
             'type'    => $type,
+            'is_read' => false,
         ]);
 
         // Broadcast real-time event via Laravel Broadcasting
@@ -31,8 +32,8 @@ class NotificationService
     {
         $this->send(
             $employeeId,
-            'New complaint assigned',
-            "A new complaint has been submitted: \"{$complainTitle}\".",
+            'Complaint submitted',
+            "Your complaint \"{$complainTitle}\" has been submitted.",
             Notification::TYPE_COMPLAINT_SUBMITTED
         );
     }
@@ -41,8 +42,8 @@ class NotificationService
     {
         $this->send(
             $userId,
-            'Your complaint was assigned',
-            "Your complaint \"{$complainTitle}\" has been assigned to {$departmentName}.",
+            'Complaint assigned',
+            "A complaint \"{$complainTitle}\" has been assigned to {$departmentName}.",
             Notification::TYPE_COMPLAINT_ASSIGNED
         );
     }

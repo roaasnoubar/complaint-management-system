@@ -14,15 +14,14 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         $roles = [
-            ['level' => 1, 'type' => 'citizen'],
-            ['level' => 2, 'type' => 'employee'],
-            ['level' => 3, 'type' => 'department_admin'],
-            ['level' => 4, 'type' => 'super_admin'],
+            ['level' => 1, 'name' => 'user'],
+            ['level' => 2, 'name' => 'employee'],
+            ['level' => 3, 'name' => 'admin'],
         ];
 
         foreach ($roles as $roleData) {
             $role = Role::updateOrCreate(
-                ['type' => $roleData['type']],
+                ['name' => $roleData['name']],
                 $roleData
             );
 
@@ -34,17 +33,14 @@ class RoleSeeder extends Seeder
     {
         $role->permissions()->detach();
 
-        match ($role->type) {
-            'citizen' => $role->permissions()->attach(
+        match ($role->name) {
+            'user' => $role->permissions()->attach(
                 Permission::whereIn('name', ['view_complaints', 'create_complaint', 'chat_complaint', 'rate_authority'])->pluck('id')
             ),
             'employee' => $role->permissions()->attach(
                 Permission::whereIn('name', ['view_complaints', 'update_complaint', 'chat_complaint'])->pluck('id')
             ),
-            'department_admin' => $role->permissions()->attach(
-                Permission::whereIn('name', ['view_complaints', 'update_complaint', 'assign_complaint', 'resolve_complaint', 'chat_complaint', 'manage_departments'])->pluck('id')
-            ),
-            'super_admin' => $role->permissions()->sync(Permission::pluck('id')),
+            'admin' => $role->permissions()->sync(Permission::pluck('id')),
             default => null,
         };
     }

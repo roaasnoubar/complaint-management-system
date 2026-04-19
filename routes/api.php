@@ -3,14 +3,15 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ComplaintController;
-use App\Http\Controllers\RatingController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\EmployeeComplaintController;
 use App\Http\Controllers\AuthorityController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ComplaintProcessingController;
-
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\RatingController;
+use App\Http\Controllers\Api\DashboardController;
 // Public Auth Routes
 Route::prefix('auth')->group(function () {
     Route::post('/register',     [AuthController::class, 'register']);
@@ -31,11 +32,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Authorities
+    Route::apiResource('authorities', AuthorityController::class)->except(['index', 'show']);
     Route::get('/authorities',         [AuthorityController::class, 'index']);
     Route::get('/authorities/{id}',    [AuthorityController::class, 'show']);
-    Route::post('/authorities',        [AuthorityController::class, 'store']);
-    Route::put('/authorities/{id}',    [AuthorityController::class, 'update']);
-    Route::delete('/authorities/{id}', [AuthorityController::class, 'destroy']);
 
     // Departments
     Route::get('/departments',                  [DepartmentController::class, 'index']);
@@ -54,10 +53,14 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // User Complaints
-    Route::post('/complaints',               [ComplaintController::class, 'submitComplaint']);
+    Route::post('/complaints', [ComplaintController::class, 'submitComplaint']);
     Route::get('/my-complaints',             [ComplaintController::class, 'getMyComplaints']);
     Route::post('/complaints/{id}/escalate', [ComplaintController::class, 'escalateComplaint']);
-    Route::post('/complaints/{id}/rate',     [RatingController::class, 'submitRating']);
+    
+    // Ratings (Sprint 6)
+    Route::post('/ratings',       [RatingController::class, 'store']);
+    Route::get('/ratings/{id}',   [RatingController::class, 'show']);
+    Route::post('/complaints/{id}/rate', [RatingController::class, 'submitRating']); // الرابط القديم إذا كنتِ تزالين تستخدمينه
 
     // Chat
     Route::get('/complaints/{id}/chat',  [ChatController::class, 'getChat']);
@@ -73,4 +76,32 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // General complaints list
     Route::get('/complaints', [ComplaintController::class, 'getComplaints']);
+
+    // Notifications
+Route::prefix('notifications')->group(function () {
+    Route::get('/', [NotificationController::class, 'index']); // عرض الكل (Pagination)
+    Route::get('/latest', [NotificationController::class, 'latest']); // آخر 5 تنبيهات للـ Dropdown
+    Route::get('/unread-count', [NotificationController::class, 'unreadCount']); // الرقم الأحمر
+    
+    // عمليات التحديث
+    Route::put('/{id}/read', [NotificationController::class, 'markAsRead']); // قراءة واحد
+    Route::put('/read-all', [NotificationController::class, 'markAllAsRead']); // قراءة الكل
+    
+    // عمليات الحذف
+    Route::delete('/clear-all', [NotificationController::class, 'deleteAll']); // حذف الكل
+    Route::delete('/{id}', [NotificationController::class, 'destroy']); // حذف واحد
 });
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/statistics', [DashboardController::class, 'getStatistics']);
+        Route::get('/complaints-by-authority', [DashboardController::class, 'complaintsByAuthority']);
+        Route::get('/complaints-by-department', [DashboardController::class, 'complaintsByDepartment']);
+        Route::get('/monthly-complaints', [DashboardController::class, 'monthlyComplaints']);
+    });
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    
+    // إضافي: مسار لتحديد الكل كمقروء (اختياري ومفيد جداً)
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+});
+    Route::get('/ping', function () {
+        return response()->json(['status' => 'OK']);
+    });

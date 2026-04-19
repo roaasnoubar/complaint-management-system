@@ -25,7 +25,9 @@ class User extends Authenticatable
         'is_verified',
         'verification_code',
         'verification_expires_at',
-        'score',
+        'score', 
+        'false_complaints_count', 
+        'is_banned',              
         'is_active',
     ];
 
@@ -38,16 +40,42 @@ class User extends Authenticatable
     protected $casts = [
         'is_verified'             => 'boolean',
         'is_active'               => 'boolean',
+        'is_banned'               => 'boolean', // جديد لـ Sprint 6
         'verification_expires_at' => 'datetime',
         'birthdate'               => 'date',
+        'score'                   => 'integer',
+        'false_complaints_count'  => 'integer',
     ];
+
+    // --- منطق Sprint 6: إدارة السكور والحظر ---
+    
+    /**
+     * تعديل سكور المستخدم والتعامل مع حالات الحظر تلقائياً
+     */
+    public function adjustScoreByValidity(bool $isValid): void
+    {
+        if ($isValid) {
+            // زيادة النقاط للشكاوى الصحيحة
+            $this->increment('score', 10);
+        } else {
+            // خصم نقاط للشكاوى الكاذبة وزيادة العداد
+            $this->decrement('score', 20);
+            $this->increment('false_complaints_count');
+
+            // تلقائياً: إذا وصلت الشكاوى الكاذبة لـ 3 يتم الحظر
+            if ($this->false_complaints_count >= 3) {
+                $this->update(['is_banned' => true, 'is_active' => false]);
+            }
+        }
+    }
+
+    // --- الدوال الموجودة مسبقاً ---
 
     public function setPasswordAttribute(string $value): void
     {
         $this->attributes['password'] = bcrypt($value);
     }
 
-    // التحقق من الصلاحيات
     public function isAdmin(): bool
     {
         return $this->role?->name === 'admin';
