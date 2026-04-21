@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E0F7FA"
+    android:padding="30dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📩"
+            android:textSize="80sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="التحقق من الحساب"
+            android:textColor="#006064"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:text="يرجى إدخال الرمز المكون من 6 أرقام المرسل إلى هاتفك"
+            android:textColor="#455A64"
+            android:textSize="16sp" />
+
+        <EditText
+            android:id="@+id/etVerifyCode"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="40dp"
+            android:background="@drawable/edit_text_bg"
+            android:gravity="center"
+            android:hint="0 0 0 0 0 0"
+            android:inputType="number"
+            android:maxLength="6"
+            android:letterSpacing="0.5"
+            android:padding="10dp"
+            android:textColor="#000000"
+            android:textColorHint="#B0BEC5"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnVerify"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="30dp"
+            android:backgroundTint="#00838F"
+            android:text="تأكيد الرمز"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:cornerRadius="15dp" />
+
+        <TextView
+            android:id="@+id/tvResendCode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="25dp"
+            android:text="لم يصلك الرمز؟ إعادة إرسال"
+            android:textColor="#00838F"
+            android:textStyle="bold"
+            android:padding="10dp" />
+
+    </LinearLayout>
+</RelativeLayout>
