@@ -12,6 +12,7 @@ class Attachment extends Model
         'user_id',
         'file_path',
         'file_type',
+        'file_name'
     ];
     protected $appends = ['full_url'];
 

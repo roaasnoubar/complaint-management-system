@@ -1,19 +1,20 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
-use App\Mail\OtpMail;
+use App\Http\Controllers\Controller; 
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log; // مضافة لضمان عمل اللوغر
 
 class AuthController extends Controller
 {
     /**
-     * تسجيل مستخدم جديد مع كامل البيانات والسكور الابتدائي
+     * تسجيل مستخدم جديد (مواطن) مع كود OTP
      */
     public function register(Request $request): JsonResponse
     {
@@ -27,19 +28,19 @@ class AuthController extends Controller
 
         $verificationCode = rand(100000, 999999);
 
-        // الموديل سيقوم بتشفير الباسوورد تلقائياً بفضل دالة setPasswordAttribute
         $user = User::create([
             'name'                    => $validated['name'],
+            'username'                => explode('@', $request->email)[0] . '_' . rand(100, 999),
             'phone'                   => $validated['phone'],
             'email'                   => $validated['email'],
             'birthdate'               => $validated['birthdate'],
-            'password'                => $validated['password'], 
+            'password'                => Hash::make($validated['password']),
             'verification_code'       => $verificationCode,
             'verification_expires_at' => now()->addMinutes(10),
             'is_verified'             => false,
-            'role_id'                 => 3, // ID الطالب الافتراضي
-            'authority_id'            => 1, // الهيئة الافتراضية
-            'score'                   => 0, // بداية السكور للاختبار
+            'role_id'                 => 3, 
+            'authority_id'            => 1, 
+            'score'                   => 0,
             'is_active'               => true,
             'is_banned'               => false,
             'false_complaints_count'  => 0,
@@ -48,31 +49,13 @@ class AuthController extends Controller
         try {
             Mail::to($user->email)->send(new OtpMail((string)$verificationCode, $user->name));
         } catch (\Exception $e) {
-            \Log::error("Mail Error: " . $e->getMessage());
+            Log::error("Mail Error: " . $e->getMessage());
         }
-
-        $user->refresh();
 
         return response()->json([
             'success' => true,
             'message' => 'Registration successful. Please check your email for the verification code.',
-            'data'    => [
-                'user' => [
-                    'id'                     => $user->id,
-                    'name'                   => $user->name,
-                    'email'                  => $user->email,
-                    'phone'                  => $user->phone,
-                    'birthdate'              => $user->birthdate ? $user->birthdate->format('Y-m-d') : null,
-                    'role_id'                => $user->role_id,
-                    'authority_id'           => $user->authority_id,
-                    'department_id'          => $user->department_id,
-                    'score'                  => $user->score,
-                    'is_verified'            => (bool)$user->is_verified,
-                    'is_active'              => (bool)$user->is_active,
-                    'is_banned'              => (bool)$user->is_banned,
-                    'false_complaints_count' => $user->false_complaints_count,
-                ],
-            ],
+            'data'    => $user->load('role'),
         ], 201);
     }
 
@@ -110,59 +93,100 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Email verified successfully.',
             'data'    => [
-                'user' => [
-                    'id'      => $user->id,
-                    'name'    => $user->name,
-                    'role_id' => $user->role_id,
-                ],
-                'token'      => $token,
+                'user'  => $user->load(['role', 'authority', 'department']),
+                'token' => $token,
                 'token_type' => 'Bearer',
             ],
         ], 200);
     }
 
     /**
-     * تسجيل الدخول بالاسم
+     * تسجيل الدخول (للمواطن والموظف)
      */
     public function login(Request $request): JsonResponse
     {
-        $request->validate([
+        $credentials = $request->validate([
             'username' => 'required|string',
             'password' => 'required|string',
         ]);
 
-        $user = User::where('name', $request->username)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!Auth::attempt(['username' => $credentials['username'], 'password' => $credentials['password']])) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid credentials.',
+                'message' => 'اسم المستخدم أو كلمة المرور غير صحيحة.'
             ], 401);
         }
 
+        $user = Auth::user();
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'message' => 'Login successful.',
+            'message' => 'تم تسجيل الدخول بنجاح',
             'data'    => [
-                'user' => [
-                    'id'            => $user->id,
-                    'name'          => $user->name,
-                    'email'         => $user->email,
-                    'role_id'       => $user->role_id,
-                    'score'         => $user->score,
-                    'is_verified'   => (bool)$user->is_verified,
-                ],
                 'token'      => $token,
                 'token_type' => 'Bearer',
+                'user'       => $user->load(['role', 'authority', 'department']),
             ],
         ], 200);
     }
 
-    public function logout(Request $request): JsonResponse
+    /**
+     * إنشاء حساب موظف جديد (للآدمن)
+     */
+    public function registerEmployee(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name'         => 'required|string|max:255',
+            'username'     => 'required|string|unique:users,username',
+            'email'        => 'required|email|unique:users,email',
+            'password'     => 'required|string|min:6',
+            'phone'        => 'required|string|unique:users,phone', // أضيفي هذا السطر
+            'authority_id' => 'required|exists:authorities,id',
+        ]);
+
+        $user = User::create([
+            'name'         => $validated['name'],
+            'username'     => $validated['username'],
+            'email'        => $validated['email'],
+            'password'     => \Illuminate\Support\Facades\Hash::make($validated['password']),
+            'phone'        => $request->phone ?? ('09' . rand(10000000, 99999999)),
+            'role_id'      => 2, 
+            'authority_id' => $validated['authority_id'],
+            'is_verified'  => true, 
+            'is_active'    => true,
+            'score'        => 0,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إنشاء حساب الموظف بنجاح.',
+            'data'    => $user->load(['role', 'authority'])
+        ], 201);
+    }
+
+    /**
+     * جلب بيانات المستخدم الحالي
+     */
+    public function me(Request $request)
+    {
+        $user = $request->user()->load(['role','authority', 'department']);
+    
+        return response()->json([
+            'success' => true,
+            'data'    => $user
+        ]);
+    }
+
+    /**
+     * تسجيل الخروج
+     */
+    public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
-        return response()->json(['success' => true, 'message' => 'Logged out successfully.'], 200);
+        return response()->json([
+            'success' => true,
+            'message' => 'Logged out successfully'
+        ]);
     }
 }

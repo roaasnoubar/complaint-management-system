@@ -1,22 +1,25 @@
 <?php
 
 namespace App\Models;
-
+use App\Models\Complain; // تأكدي أنه بدون t في النهاية ليطابق اسم الموديل
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Carbon\Carbon; // تأكدي من استدعاء Carbon للتعامل مع الوقت
 
 class Complain extends Model
 {
     protected $table = 'complains';
 
+    // 1. إضافة الحقول الجديدة للـ fillable
     protected $fillable = [
+        'full_name',   
         'complain_number',
         'user_id',
         'auth_id',
         'department_id',
-        'priority',
+        'priority', 
         'current_department_id',
         'title',
         'description',
@@ -27,26 +30,27 @@ class Complain extends Model
         'resolved_at',
     ];
 
+    // 2. إخبار لارافيل بإضافة الحقل الوهمي (المقروء) للـ JSON تلقائياً
+    protected $appends = ['created_at_human'];
+
     protected $casts = [
         'resolved_at' => 'datetime',
         'assigned_at' => 'datetime',
         'is_valid'    => 'boolean',
     ];
 
+    // الثوابت (تبقى كما هي)
     const STATUS_PENDING     = 'Pending';
     const STATUS_IN_PROGRESS = 'In Progress';
     const STATUS_RESOLVED    = 'Resolved';
 
-    const LEVEL_EMPLOYEE = 3;
-    const LEVEL_MANAGER  = 2;
-    const LEVEL_HEAD     = 1;
-
-    const ESCALATION_DAYS = 5;
-
-    const STATUS_TRANSITIONS = [
-        'Pending'     => 'In Progress',
-        'In Progress' => 'Resolved',
-    ];
+    // 3. دالة التاريخ المقروء (Human Readable Time)
+    public function getCreatedAtHumanAttribute(): string
+    {
+        // لترجمة الوقت للعربية يمكنك استخدام: return $this->created_at->diffForHumans();
+        // مع التأكد من ضبط الـ locale في config/app.php إلى 'ar'
+        return $this->created_at->diffForHumans();
+    }
 
     protected static function booted(): void
     {
@@ -55,11 +59,14 @@ class Complain extends Model
         });
 
         static::created(function (Complain $complain) {
-            ComplainChat::create([
-                'complain_id' => $complain->id,
-                'user_id'     => $complain->user_id,
-                'is_open'     => true,
-            ]);
+            // تأكدي من وجود موديل ComplainChat
+            if (class_exists(ComplainChat::class)) {
+                ComplainChat::create([
+                    'complain_id' => $complain->id,
+                    'user_id'     => $complain->user_id,
+                    'is_open'     => true,
+                ]);
+            }
         });
 
         static::updated(function (Complain $complain) {
@@ -77,55 +84,18 @@ class Complain extends Model
 
     public static function generateComplainNumber(): string
     {
-        $year        = now()->year;
-        $last        = self::orderBy('id', 'desc')->first();
-        $nextNumber  = $last ? ($last->id + 1) : 1;
+        $year       = now()->year;
+        $last       = self::orderBy('id', 'desc')->first();
+        $nextNumber = $last ? ($last->id + 1) : 1;
         return 'CMP-' . $year . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
     }
 
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function authority(): BelongsTo
-    {
-        return $this->belongsTo(Authority::class, 'auth_id');
-    }
-
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class);
-    }
-
-    public function currentDepartment(): BelongsTo
-    {
-        return $this->belongsTo(Department::class, 'current_department_id');
-    }
-
-    public function attachments(): HasMany
-    {
-        return $this->hasMany(Attachment::class, 'complain_id');
-    }
-
-    public function chat(): HasOne
-    {
-        return $this->hasOne(ComplainChat::class, 'complain_id');
-    }
-
-    public function rattings(): HasMany
-    {
-        return $this->hasMany(Ratting::class, 'complain_id');
-    }
-
-    public function canEscalate(): bool
-    {
-        if ($this->status === self::STATUS_RESOLVED) return false;
-        if ($this->assigned_level <= self::LEVEL_HEAD) return false;
-
-        $assignedAt = $this->assigned_at ?? $this->created_at;
-        return $assignedAt->diffInDays(now()) >= self::ESCALATION_DAYS;
-    }
+    // العلاقات
+    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function authority(): BelongsTo { return $this->belongsTo(Authority::class, 'auth_id'); }
+    public function department(): BelongsTo { return $this->belongsTo(Department::class); }
+    public function attachments(): HasMany { return $this->hasMany(Attachment::class, 'complain_id'); }
+    public function chat(): HasOne { return $this->hasOne(ComplainChat::class, 'complain_id'); }
 
     public function getLevelNameAttribute(): string
     {

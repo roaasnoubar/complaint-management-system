@@ -8,10 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('authorities', function (Blueprint $table) {
+        Schema::create('departments', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('complain_id')->nullable();
-            $table->unsignedBigInteger('department_id')->nullable();
+            // الربط مع الأب (authorities)
+            $table->foreignId('authority_id')->constrained('authorities')->onDelete('cascade');
             $table->string('name');
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
@@ -21,6 +21,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('authorities');
+        Schema::dropIfExists('departments');
     }
 };

@@ -14,21 +14,11 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'name',
-        'email',
-        'phone',
-        'birthdate',
-        'password',
-        'role_id',
-        'authority_id',
-        'department_id',
-        'is_verified',
-        'verification_code',
-        'verification_expires_at',
-        'score', 
-        'false_complaints_count', 
-        'is_banned',              
-        'is_active',
+        'name', 
+        'username',
+         'email', 'phone', 'birthdate', 'password', 
+        'verification_code', 'verification_expires_at', 'is_verified', 
+        'role_id', 'authority_id', 'score', 'is_active', 'is_banned', 'false_complaints_count'
     ];
 
     protected $hidden = [
@@ -40,11 +30,12 @@ class User extends Authenticatable
     protected $casts = [
         'is_verified'             => 'boolean',
         'is_active'               => 'boolean',
-        'is_banned'               => 'boolean', // جديد لـ Sprint 6
+        'is_banned'               => 'boolean', 
         'verification_expires_at' => 'datetime',
         'birthdate'               => 'date',
         'score'                   => 'integer',
         'false_complaints_count'  => 'integer',
+        'password'                => 'hashed', 
     ];
 
     // --- منطق Sprint 6: إدارة السكور والحظر ---
@@ -71,11 +62,7 @@ class User extends Authenticatable
 
     // --- الدوال الموجودة مسبقاً ---
 
-    public function setPasswordAttribute(string $value): void
-    {
-        $this->attributes['password'] = bcrypt($value);
-    }
-
+    
     public function isAdmin(): bool
     {
         return $this->role?->name === 'admin';
@@ -104,11 +91,10 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
-    public function authority(): BelongsTo
-    {
-        return $this->belongsTo(Authority::class);
-    }
-
+    public function authority()
+{
+    return $this->belongsTo(Authority::class);
+}
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);

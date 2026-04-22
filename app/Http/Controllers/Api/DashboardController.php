@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\JsonResponse;
 
 class DashboardController extends Controller
 {
-    // 1. الإحصائيات العامة
-    public function getStatistics()
+    /**
+     * 1. الإحصائيات العامة (إجمالي الشكاوى حسب الحالة)
+     */
+    public function getStatistics(): JsonResponse
     {
         $stats = DB::table('complains')
             ->selectRaw('count(*) as total')
@@ -31,33 +34,45 @@ class DashboardController extends Controller
         ]);
     }
 
-    // 2. الشكاوى حسب الهيئة (تعديل auth_id بناءً على الصورة)
-    public function complaintsByAuthority()
+    /**
+     * 2. الشكاوى حسب الهيئة (Authorities)
+     */
+    public function complaintsByAuthority(): JsonResponse
     {
         $data = DB::table('authorities')
             ->leftJoin('complains', 'authorities.id', '=', 'complains.auth_id')
-            ->select('authorities.name', DB::raw('count(complains.complain_number) as count'))
+            ->select('authorities.name', DB::raw('count(complains.id) as count'))
             ->groupBy('authorities.id', 'authorities.name')
             ->get();
 
-        return response()->json(['success' => true, 'data' => $data]);
+        return response()->json([
+            'success' => true, 
+            'data' => $data
+        ]);
     }
 
-    // 3. الشكاوى حسب القسم
-    public function complaintsByDepartment()
+    /**
+     * 3. الشكاوى حسب القسم (Departments)
+     */
+    public function complaintsByDepartment(): JsonResponse
     {
         $data = DB::table('departments')
             ->leftJoin('complains', 'departments.id', '=', 'complains.department_id')
-            ->select('departments.name', DB::raw('count(complains.complain_number) as count'))
+            ->select('departments.name', DB::raw('count(complains.id) as count'))
             ->groupBy('departments.id', 'departments.name')
             ->orderBy('count', 'desc')
             ->get();
 
-        return response()->json(['success' => true, 'data' => $data]);
+        return response()->json([
+            'success' => true, 
+            'data' => $data
+        ]);
     }
 
-    // 4. الإحصائيات الشهرية
-    public function monthlyComplaints()
+    /**
+     * 4. الإحصائيات الشهرية (آخر 6 أشهر)
+     */
+    public function monthlyComplaints(): JsonResponse
     {
         $data = DB::table('complains')
             ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month")
@@ -67,6 +82,9 @@ class DashboardController extends Controller
             ->orderBy('month', 'asc')
             ->get();
 
-        return response()->json(['success' => true, 'data' => $data]);
+        return response()->json([
+            'success' => true, 
+            'data' => $data
+        ]);
     }
 }

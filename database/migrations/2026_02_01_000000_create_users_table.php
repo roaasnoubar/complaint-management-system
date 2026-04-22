@@ -10,33 +10,31 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // دمجنا الاسم هنا ليتوافق مع الموديل
+            $table->string('name'); 
+            $table->string('username')->unique(); 
             $table->string('email')->unique()->nullable();
             $table->string('phone')->unique();
             $table->date('birthdate')->nullable();
             $table->string('password');
             
-            // نظام التحقق
+            // نظام التحقق (OTP)
             $table->boolean('is_verified')->default(false);
             $table->string('verification_code')->nullable();
             $table->timestamp('verification_expires_at')->nullable();
             
-            // الربط مع الجداول الأخرى
-            $table->unsignedBigInteger('role_id')->nullable();
-            $table->unsignedBigInteger('authority_id')->nullable();
-            $table->unsignedBigInteger('department_id')->nullable();
+            // الربط مع الجداول الأخرى (Foreign Keys)
+            $table->foreignId('role_id')->nullable()->constrained('roles')->onDelete('set null');
+            $table->foreignId('authority_id')->nullable()->constrained('authorities')->onDelete('set null');
+            $table->foreignId('department_id')->nullable()->constrained('departments')->onDelete('set null');
             
-            // إحصائيات وحالة الحساب
+            // إحصائيات وحالة الحساب (مهمة لنظام الشكاوى)
             $table->integer('score')->default(0);
+            $table->integer('false_complaints_count')->default(0); // أضفته ليناسب الكود السابق
             $table->boolean('is_active')->default(true);
+            $table->boolean('is_banned')->default(false); // أضفته لإدارة المستخدمين المسيئين
             
             $table->rememberToken();
             $table->timestamps();
-
-            // الفهارس لتسريع البحث
-            $table->index('role_id');
-            $table->index('authority_id');
-            $table->index('department_id');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
