@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F7F9"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <!-- عنوان الواجهة -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="الرد على الشكوى"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="#006064"
+        android:gravity="center"
+        android:layout_marginBottom="30dp"/>
+
+    <!-- بوكس معلومات إضافية -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="معلومات إضافية للموظف (داخلية):"
+        android:textColor="#546E7A"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp"/>
+
+    <EditText
+        android:id="@+id/etInternalNotes"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:background="@android:color/white"
+        android:elevation="2dp"
+        android:gravity="top"
+        android:hint="اكتب ملاحظات داخلية لا يراها المستخدم..."
+        android:padding="12dp"
+        android:textSize="15sp"
+        android:layout_marginBottom="20dp"/>
+
+    <!-- بوكس الرد الرسمي -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="الرد الرسمي (يظهر للمواطن):"
+        android:textColor="#546E7A"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp"/>
+
+    <LinearLayout
+        android:id="@+id/boxOfficialReply"
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:background="@android:color/white"
+        android:elevation="3dp"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:id="@+id/tvOfficialReplyPlaceholder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="اضغط هنا لكتابة الرد الرسمي في صفحة كاملة..."
+            android:textColor="#B0BEC5"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnSubmitReply"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:layout_marginTop="30dp"
+        android:text="إرسال الرد النهائي"
+        android:backgroundTint="#00838F"
+        android:textColor="@android:color/white"
+        app:cornerRadius="8dp" />
+
+</LinearLayout>

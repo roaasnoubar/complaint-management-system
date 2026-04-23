@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <!-- مساحة الكتابة: تم تعديلها لتكون بيضاء سادة وبدون إطار -->
+    <EditText
+        android:id="@+id/etFullScreenInput"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@android:color/transparent"
+        android:gravity="top"
+        android:hint="ابدأ بكتابة الرد هنا..."
+        android:textColor="#212121"
+        android:textColorHint="#B0BEC5"
+        android:textSize="18sp"
+        android:importantForAutofill="no"
+        android:inputType="textMultiLine"
+        android:padding="10dp" />
+
+    <!-- زر الإنهاء: بون متناسق مع التطبيق (تركواز) -->
+    <Button
+        android:id="@+id/btnDone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:text="تم الحفظ"
+        android:textAllCaps="false"
+        android:backgroundTint="#00838F"
+        android:textColor="@android:color/white"
+        android:elevation="0dp" />
+
+</LinearLayout>
