@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Models;
-use App\Models\Complain; // تأكدي أنه بدون t في النهاية ليطابق اسم الموديل
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -43,6 +42,14 @@ class Complain extends Model
     const STATUS_PENDING     = 'Pending';
     const STATUS_IN_PROGRESS = 'In Progress';
     const STATUS_RESOLVED    = 'Resolved';
+    const STATUS_REJECTED    = 'Rejected'; // <--- أضيفي هذا السطر هنا (ضروري جداً)
+
+    const STATUS_TRANSITIONS = [
+        self::STATUS_PENDING     => [self::STATUS_IN_PROGRESS, self::STATUS_REJECTED],
+        self::STATUS_IN_PROGRESS => [self::STATUS_RESOLVED, self::STATUS_REJECTED],
+        self::STATUS_RESOLVED    => [],
+        self::STATUS_REJECTED    => [],
+    ];
 
     // 3. دالة التاريخ المقروء (Human Readable Time)
     public function getCreatedAtHumanAttribute(): string

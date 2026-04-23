@@ -9,8 +9,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Log; // مضافة لضمان عمل اللوغر
-
+use Illuminate\Support\Facades\Log;
+use App\Mail\OtpMail;               // هاد السطر اللي ناقصك (قالب الرسالة)
 class AuthController extends Controller
 {
     /**

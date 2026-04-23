@@ -1,63 +1,73 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
 use App\Mail\StatusChangedMail;
 use App\Models\Complain;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
-
-class ComplaintProcessingController extends Controller
+class ComplaintProcessingController extends \App\Http\Controllers\Controller
 {
     /**
      * تحديث حالة الشكوى (استلام، حل) مع تحديث نقاط المصداقية وتوقيت التعيين.
      */
     public function updateStatus(Request $request, $id): JsonResponse
-    {
-        $user     = $request->user();
-        $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
+{
+    $user     = $request->user();
+    $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
 
-        // 1. التحقق من الصلاحيات
-        if (!$user->isEmployee() && !$user->isAdmin()) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
+    // 1. التحقق من الصلاحيات
+    if (!$user->isEmployee() && !$user->isAdmin()) {
+        return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
+    }
+
+    // 2. الموظف يعالج فقط شكاوى قسمه وجهته
+    if ($user->isEmployee()) {
+        // نصيحة: استخدمي intval لضمان دقة المقارنة بين الأنواع
+        if (intval($complain->auth_id) !== intval($user->authority_id) || 
+            intval($complain->department_id) !== intval($user->department_id)) {
+            return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
         }
+    }
 
-        // 2. الموظف يعالج فقط شكاوى قسمه وجهته
-        if ($user->isEmployee()) {
-            if ($complain->auth_id !== $user->authority_id || $complain->department_id !== $user->department_id) {
-                return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
-            }
+    // 3. التحقق من الانتقال المسموح به للحالة
+    $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
+
+    if (!$allowedNextStatus) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Complaint is already resolved or in a final state.',
+        ], 422);
+    }
+
+    // تصحيح الثغرة: بما أن STATUS_TRANSITIONS مصفوفة، نأخذ العنصر الأول [0] 
+    // ليتخزن كنص (String) في الداتا بيز ولا يعطي خطأ SQL
+    $nextStatusValue = is_array($allowedNextStatus) ? $allowedNextStatus[0] : $allowedNextStatus;
+
+    $previousStatus   = $complain->status;
+    $complain->status = $nextStatusValue;
+
+    // --- معالجة الثغرات المنطقية (كما هي في كودك) ---
+    if ($nextStatusValue === Complain::STATUS_IN_PROGRESS) {
+        $complain->assigned_at = now(); // بدء عداد الـ 5 أيام
+    }
+
+    if ($nextStatusValue === Complain::STATUS_RESOLVED) {
+        $complain->resolved_at = now();
+        if ($complain->user) {
+            $complain->user->increment('score'); // زيادة المصداقية
         }
+    }
 
-        // 3. التحقق من الانتقال المسموح به للحالة
-        $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
+    $complain->save();
 
-        if (!$allowedNextStatus) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Complaint is already resolved or in a final state.',
-            ], 422);
-        }
-
-        $previousStatus   = $complain->status;
-        $complain->status = $allowedNextStatus;
-
-        // --- معالجة الثغرات المنطقية ---
-        if ($allowedNextStatus === Complain::STATUS_IN_PROGRESS) {
-            $complain->assigned_at = now(); // بدء عداد الـ 5 أيام
-        }
-
-        if ($allowedNextStatus === Complain::STATUS_RESOLVED) {
-            $complain->resolved_at = now();
-            if ($complain->user) {
-                $complain->user->increment('score'); // زيادة المصداقية
-            }
-        }
-
-        $complain->save();
-
+    return response()->json([
+        'success' => true,
+        'message' => 'Status updated successfully.',
+        'data' => $complain]);
         // إرسال الإشعار
         $this->sendStatusEmail($complain, $allowedNextStatus);
 

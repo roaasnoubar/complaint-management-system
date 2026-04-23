@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api; 
 
+use App\Http\Controllers\Controller;
 use App\Models\Authority;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-
-class AuthorityController extends Controller
+class AuthorityController extends \App\Http\Controllers\Controller
 {
     public function index(): JsonResponse
     {

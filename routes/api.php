@@ -1,17 +1,15 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\EmployeeComplaintController;
-use App\Http\Controllers\AuthorityController;
-use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\UserManagementController;
-use App\Http\Controllers\ComplaintProcessingController;
+use App\Http\Controllers\Api\EmployeeComplaintController;
+use App\Http\Controllers\Api\AuthorityController;
+use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\UserManagementController;
+use App\Http\Controllers\Api\ComplaintProcessingController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ComplaintController;
-use App\Http\Controllers\Api\ComplainChatController; // تأكدي من استدعاء الكنترولر الجديد
-
+use App\Http\Controllers\Api\ComplainChatController;
 /*
 |--------------------------------------------------------------------------
 | Public Routes (لا تحتاج تسجيل دخول)

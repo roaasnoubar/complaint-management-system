@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
 use App\Models\Complain;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-
-class EmployeeComplaintController extends Controller
+class EmployeeComplaintController extends \App\Http\Controllers\Controller
 {
     public function getComplaints(Request $request): JsonResponse
     {
