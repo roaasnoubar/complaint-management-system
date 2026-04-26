@@ -104,33 +104,38 @@ class AuthController extends Controller
      * تسجيل الدخول (للمواطن والموظف)
      */
     public function login(Request $request): JsonResponse
-    {
-        $credentials = $request->validate([
-            'username' => 'required|string',
-            'password' => 'required|string',
-        ]);
+{
+    // 1. التحقق من البيانات (جعلنا الحقل يقبل أي نص سواء إيميل أو يوزرنيم)
+    $credentials = $request->validate([
+        'username' => 'required|string', // سنبقي الاسم 'username' في Postman لتجنب تغيير التيست، لكنه سيقبل إيميل أيضاً
+        'password' => 'required|string',
+    ]);
 
-        if (!Auth::attempt(['username' => $credentials['username'], 'password' => $credentials['password']])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'اسم المستخدم أو كلمة المرور غير صحيحة.'
-            ], 401);
-        }
+    // 2. تحديد نوع الحقل (هل المدخل إيميل أم يوزرنيم؟)
+    $loginField = filter_var($request->username, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
-        $user = Auth::user();
-        $token = $user->createToken('auth_token')->plainTextToken;
-
+    // 3. محاولة تسجيل الدخول بناءً على النوع المحدد
+    if (!Auth::attempt([$loginField => $request->username, 'password' => $request->password])) {
         return response()->json([
-            'success' => true,
-            'message' => 'تم تسجيل الدخول بنجاح',
-            'data'    => [
-                'token'      => $token,
-                'token_type' => 'Bearer',
-                'user'       => $user->load(['role', 'authority', 'department']),
-            ],
-        ], 200);
+            'success' => false,
+            'message' => 'بيانات الدخول غير صحيحة (الإيميل/اسم المستخدم أو كلمة المرور).'
+        ], 401);
     }
 
+    // 4. جلب المستخدم الحالي وإنشاء التوكن
+    $user = Auth::user();
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    return response()->json([
+        'success' => true,
+        'message' => 'تم تسجيل الدخول بنجاح',
+        'data'    => [
+            'token'      => $token,
+            'token_type' => 'Bearer',
+            'user'       => $user->load(['role', 'authority', 'department']), // تحميل العلاقات لضمان ظهور IDs الأقسام والجهات
+        ],
+    ], 200);
+}
     /**
      * إنشاء حساب موظف جديد (للآدمن)
      */

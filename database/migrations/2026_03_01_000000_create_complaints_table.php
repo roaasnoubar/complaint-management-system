@@ -13,29 +13,23 @@ return new class extends Migration
     {
         Schema::create('complains', function (Blueprint $table) {
             $table->id();
-            // رقم الشكوى الفريد
             $table->string('complain_number')->unique();
-            
-            // بيانات مقدم الشكوى
             $table->string('full_name'); 
             $table->unsignedBigInteger('user_id'); 
             
-            // الربط مع الجهة والقسم المختص
-            $table->unsignedBigInteger('auth_id'); 
+            // توحيد المسمى مع الموديلات السابقة
+            $table->unsignedBigInteger('authority_id'); 
             $table->unsignedBigInteger('department_id'); 
             $table->unsignedBigInteger('current_department_id')->nullable(); 
-
-            // --- الحقول المضافة لحل مشكلة Unknown Column ---
-            $table->unsignedBigInteger('category_id')->nullable(); // لتصنيف نوع الشكوى (تقنية، إدارية...)
-            $table->string('priority')->default('normal'); // الأولوية التي كان يبحث عنها الكود
-            $table->string('location')->nullable(); // مكان المشكلة (اختياري)
-            // ----------------------------------------------
+        
+            $table->unsignedBigInteger('category_id')->nullable(); 
+            $table->string('priority')->default('normal'); 
+            $table->string('location')->nullable(); 
             
-            // محتوى الشكوى
             $table->string('title');
             $table->text('description');
             
-            // حالة الشكوى وتفاصيل المعالجة
+            // التأكد من تطابق الحالات مع الموديل
             $table->enum('status', ['Pending', 'In Progress', 'Resolved', 'Rejected'])->default('Pending');
             $table->boolean('is_valid')->default(true);
             $table->integer('assigned_level')->default(3); 
@@ -43,16 +37,16 @@ return new class extends Migration
             $table->timestamp('assigned_at')->nullable();
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
-
-            // الفهارس والروابط الخارجية
+        
+            // العلاقات
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('auth_id')->references('id')->on('authorities')->onDelete('cascade');
+            $table->foreign('authority_id')->references('id')->on('authorities')->onDelete('cascade');
             $table->foreign('department_id')->references('id')->on('departments')->onDelete('cascade');
+            $table->foreign('current_department_id')->references('id')->on('departments')->onDelete('set null');
             
-            $table->index(['user_id', 'auth_id', 'status']); // فهرس مركب لسرعة البحث
+            $table->index(['user_id', 'authority_id', 'status']); 
         });
     }
-
     public function down(): void
     {
         Schema::dropIfExists('complains');

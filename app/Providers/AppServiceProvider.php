@@ -3,8 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Complain;
-use App\Models\ChatMessage;
-use App\Models\CantMessage;
+use App\Models\ChatMessage; 
 use App\Observers\ComplainObserver;
 use App\Observers\ChatMessageObserver;
 use App\Services\NotificationService;
@@ -20,9 +19,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Register Eloquent observers
+        // 1. مراقب الشكاوى
         Complain::observe(ComplainObserver::class);
-        CantMessage::observe(ChatMessageObserver::class);
-        ChatMessage::observe(ChatMessageObserver::class);
+
+        // 2. مراقب الرسائل (نستخدم ChatMessage فقط)
+        if (class_exists(ChatMessage::class)) {
+            ChatMessage::observe(ChatMessageObserver::class);
+        }
+        
+        // ملاحظة: قمت بحذف السطر الذي يحتوي على CantMessage لأنه يسبب الخطأ
     }
 }

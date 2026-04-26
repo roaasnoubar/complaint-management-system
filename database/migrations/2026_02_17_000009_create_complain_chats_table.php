@@ -8,21 +8,32 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('complain_chats', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('complain_id')->unique();
-            $table->unsignedBigInteger('user_id');
-            $table->boolean('is_open')->default(true);
-            $table->timestamp('closed_at')->nullable();
-            $table->timestamps();
+        // نستخدم if (!Schema::hasTable) لضمان عدم محاولة الإنشاء إذا وجد الجدول لسبب ما
+        if (!Schema::hasTable('chat_messages')) {
+            Schema::create('chat_messages', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('chat_id'); 
+                $table->unsignedBigInteger('sender_id');
+                $table->text('message')->nullable();
+                $table->string('file_path')->nullable();
+                $table->string('file_type')->nullable();
+                $table->timestamp('sent_at')->useCurrent();
+                $table->timestamps();
+            });
 
-            $table->index('complain_id');
-            $table->index('user_id');
-        });
+            // إضافة الروابط بعد التأكد من وجود الجداول الأب
+            Schema::table('chat_messages', function (Blueprint $table) {
+                // ملاحظة: تأكدي أن جدول complain_chats موجود بالفعل قبل تشغيل هذا الملف
+                if (Schema::hasTable('complain_chats')) {
+                    $table->foreign('chat_id')->references('id')->on('complain_chats')->onDelete('cascade');
+                }
+                $table->foreign('sender_id')->references('id')->on('users')->onDelete('cascade');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('complain_chats');
+        Schema::dropIfExists('chat_messages');
     }
 };

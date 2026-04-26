@@ -1,22 +1,22 @@
 <?php
 
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Carbon\Carbon; // تأكدي من استدعاء Carbon للتعامل مع الوقت
+use Carbon\Carbon;
 
 class Complain extends Model
 {
     protected $table = 'complains';
 
-    // 1. إضافة الحقول الجديدة للـ fillable
     protected $fillable = [
         'full_name',   
         'complain_number',
         'user_id',
-        'auth_id',
+        'authority_id',
         'department_id',
         'priority', 
         'current_department_id',
@@ -29,8 +29,8 @@ class Complain extends Model
         'resolved_at',
     ];
 
-    // 2. إخبار لارافيل بإضافة الحقل الوهمي (المقروء) للـ JSON تلقائياً
-    protected $appends = ['created_at_human'];
+    // إضافة الحقول الوهمية للـ JSON لسهولة التعامل مع الأندرويد
+    protected $appends = ['created_at_human', 'level_name', 'can_chat'];
 
     protected $casts = [
         'resolved_at' => 'datetime',
@@ -38,11 +38,10 @@ class Complain extends Model
         'is_valid'    => 'boolean',
     ];
 
-    // الثوابت (تبقى كما هي)
     const STATUS_PENDING     = 'Pending';
     const STATUS_IN_PROGRESS = 'In Progress';
     const STATUS_RESOLVED    = 'Resolved';
-    const STATUS_REJECTED    = 'Rejected'; // <--- أضيفي هذا السطر هنا (ضروري جداً)
+    const STATUS_REJECTED    = 'Rejected';
 
     const STATUS_TRANSITIONS = [
         self::STATUS_PENDING     => [self::STATUS_IN_PROGRESS, self::STATUS_REJECTED],
@@ -51,22 +50,70 @@ class Complain extends Model
         self::STATUS_REJECTED    => [],
     ];
 
-    // 3. دالة التاريخ المقروء (Human Readable Time)
+    /**
+     * دالة التحقق من صلاحية المراسلة (كاملة لكل المستويات)
+     */
+    public function canAccessChat($user): bool
+    {
+        if (!$user) return false;
+
+        // 1. إذا كانت الشكوى محلولة أو مرفوضة، يُغلق الشات للجميع
+        if (in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_REJECTED])) {
+            return false;
+        }
+
+        // 2. صاحب الشكوى (Level 4 / User)
+        if ($user->id === $this->user_id) {
+            return true;
+        }
+
+        // حساب الأيام منذ تاريخ الإسناد لهذا المستوى
+        $days = $this->assigned_at ? $this->assigned_at->diffInDays(now()) : 0;
+
+        // 3. صلاحيات الموظفين والمدراء بناءً على المستوى الحالي للشكوى
+        return match($user->role->level) {
+            3 => ($this->assigned_level == 3 && $days <= 5),  // موظف: أول 5 أيام
+            2 => ($this->assigned_level == 2 && $days <= 10), // مدير قسم: حتى اليوم 10
+            1 => ($this->assigned_level == 1),                // مدير الجهة: لا سقف زمني
+            default => false,
+        };
+    }
+
+    // Accessor لاستخدام الدالة في الـ API كحقل can_chat
+    public function getCanChatAttribute(): bool
+    {
+        return $this->canAccessChat(auth()->user());
+    }
+
     public function getCreatedAtHumanAttribute(): string
     {
-        // لترجمة الوقت للعربية يمكنك استخدام: return $this->created_at->diffForHumans();
-        // مع التأكد من ضبط الـ locale في config/app.php إلى 'ar'
         return $this->created_at->diffForHumans();
+    }
+
+    public function getLevelNameAttribute(): string
+    {
+        return match($this->assigned_level) {
+            3       => 'Employee',
+            2       => 'Department Manager',
+            1       => 'Head of Organization',
+            default => 'Unknown',
+        };
     }
 
     protected static function booted(): void
     {
         static::creating(function (Complain $complain) {
             $complain->complain_number = self::generateComplainNumber();
+            if (empty($complain->assigned_level)) {
+                $complain->assigned_level = 3;
+            }
+            $complain->assigned_at = now();
+            if (empty($complain->current_department_id)) {
+                $complain->current_department_id = $complain->department_id;
+            }
         });
 
         static::created(function (Complain $complain) {
-            // تأكدي من وجود موديل ComplainChat
             if (class_exists(ComplainChat::class)) {
                 ComplainChat::create([
                     'complain_id' => $complain->id,
@@ -77,13 +124,16 @@ class Complain extends Model
         });
 
         static::updated(function (Complain $complain) {
-            if ($complain->status === self::STATUS_RESOLVED) {
+            if (in_array($complain->status, [self::STATUS_RESOLVED, self::STATUS_REJECTED])) {
                 $chat = ComplainChat::where('complain_id', $complain->id)->first();
                 if ($chat && $chat->is_open) {
                     $chat->update([
                         'is_open'   => false,
                         'closed_at' => now(),
                     ]);
+                }
+                if (is_null($complain->resolved_at)) {
+                    $complain->updateQuietly(['resolved_at' => now()]);
                 }
             }
         });
@@ -97,20 +147,12 @@ class Complain extends Model
         return 'CMP-' . $year . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
     }
 
-    // العلاقات
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function authority(): BelongsTo { return $this->belongsTo(Authority::class, 'auth_id'); }
+    public function authority()
+{
+    return $this->belongsTo(Authority::class, 'authority_id');
+}
     public function department(): BelongsTo { return $this->belongsTo(Department::class); }
     public function attachments(): HasMany { return $this->hasMany(Attachment::class, 'complain_id'); }
     public function chat(): HasOne { return $this->hasOne(ComplainChat::class, 'complain_id'); }
-
-    public function getLevelNameAttribute(): string
-    {
-        return match($this->assigned_level) {
-            3       => 'Employee',
-            2       => 'Department Manager',
-            1       => 'Head of Organization',
-            default => 'Unknown',
-        };
-    }
 }

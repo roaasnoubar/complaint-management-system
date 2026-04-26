@@ -6,161 +6,140 @@ use App\Http\Controllers\Controller;
 use App\Models\Complain;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-class EmployeeComplaintController extends \App\Http\Controllers\Controller
+
+class EmployeeComplaintController extends Controller
 {
+    /**
+     * عرض قائمة الشكاوى الموجهة لقسم الموظف حصراً
+     * يتم الترتيب حسب سكور المستخدم (الأولوية للأكثر مصداقية)
+     */
     public function getComplaints(Request $request): JsonResponse
     {
         $employee = $request->user();
 
+        // 1. التحقق من الصلاحيات (يجب أن يكون موظف أو أدمن)
         if (!$employee->isEmployee() && !$employee->isAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only employees can access this.',
+                'message' => 'Unauthorized. Only employees or admins can access this.',
             ], 403);
         }
 
+        // 2. بناء الاستعلام مع العلاقات الأساسية
         $query = Complain::with(['user', 'authority', 'department', 'attachments']);
 
+        // 3. تطبيق فلترة الخصوصية (الموظف يرى قسمه وجهته فقط)
         if ($employee->isEmployee()) {
             $query->where('complains.auth_id', $employee->authority_id)
                   ->where('complains.department_id', $employee->department_id);
         }
 
+        // 4. فلاتر إضافية اختيارية (بناءً على طلب الـ API)
         if ($request->has('status')) {
             $query->where('complains.status', $request->status);
         }
 
-        if ($request->has('auth_id') && $employee->isAdmin()) {
-            $query->where('complains.auth_id', $request->auth_id);
+        // الأدمن يمكنه الفلترة يدوياً لأي قسم أو جهة
+        if ($employee->isAdmin()) {
+            if ($request->has('auth_id')) {
+                $query->where('complains.auth_id', $request->auth_id);
+            }
+            if ($request->has('department_id')) {
+                $query->where('complains.department_id', $request->department_id);
+            }
         }
 
-        if ($request->has('department_id') && $employee->isAdmin()) {
-            $query->where('complains.department_id', $request->department_id);
-        }
-
-        // Sort by user score descending (higher score = higher priority)
+        // 5. الترتيب الذكي (Join مع جدول المستخدمين للترتيب حسب السكور)
         $query->leftJoin('users', 'complains.user_id', '=', 'users.id')
-              ->orderBy('users.score', 'desc')
-              ->orderBy('complains.created_at', 'asc')
+              ->orderBy('users.score', 'desc') // الأولوية للسكور الأعلى
+              ->orderBy('complains.created_at', 'asc') // ثم الأقدم فالأحدث
               ->select('complains.*');
 
-        $complains = $query->paginate(10);
+        $complaints = $query->paginate(15);
 
-        $complains->getCollection()->transform(function ($complain) {
-            return [
-                'id'              => $complain->id,
-                'complain_number' => $complain->complain_number,
-                'title'           => $complain->title,
-                'description'     => $complain->description,
-                'status'          => $complain->status,
-                'is_valid'        => $complain->is_valid,
-                'assigned_level'  => $complain->assigned_level,
-                'level_name'      => $complain->level_name,
-                'can_escalate'    => $complain->canEscalate(),
-                'submitted_at'    => $complain->created_at,
-                'resolved_at'     => $complain->resolved_at,
-                'user'            => [
-                    'id'       => $complain->user->id,
-                    'name'     => $complain->user->name,
-                    'phone'    => $complain->user->phone,
-                    'score'    => $complain->user->score,
-                    'priority' => $complain->user->score >= 10 ? 'High' : ($complain->user->score >= 5 ? 'Medium' : 'Low'),
-                ],
-                'authority'   => [
-                    'id'   => $complain->authority->id,
-                    'name' => $complain->authority->name,
-                ],
-                'department'  => [
-                    'id'   => $complain->department->id,
-                    'name' => $complain->department->name,
-                ],
-                'attachments' => $complain->attachments->map(function ($attachment) {
-                    return [
-                        'id'        => $attachment->id,
-                        'file_path' => asset('storage/' . $attachment->file_path),
-                        'file_type' => $attachment->file_type,
-                    ];
-                }),
-            ];
+        // 6. تحويل البيانات لشكل متناسق مع تطبيق الموبايل
+        $complaints->getCollection()->transform(function ($complain) {
+            return $this->formatComplainResponse($complain);
         });
 
-        return response()->json(['success' => true, 'data' => $complains], 200);
+        return response()->json([
+            'success' => true,
+            'data' => $complaints
+        ], 200);
     }
 
+    /**
+     * عرض تفاصيل شكوى محددة مع المحادثة
+     */
     public function getComplaint(Request $request, $id): JsonResponse
     {
         $employee = $request->user();
 
-        if (!$employee->isEmployee() && !$employee->isAdmin()) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
-        }
-
         $complain = Complain::with(['user', 'authority', 'department', 'attachments', 'chat.messages.sender'])
                             ->findOrFail($id);
 
+        // حماية البيانات: التأكد أن الموظف يحاول عرض شكوى تابعة لقسمه فعلاً
         if ($employee->isEmployee()) {
-            if ($complain->auth_id !== $employee->authority_id ||
+            if ($complain->auth_id !== $employee->authority_id || 
                 $complain->department_id !== $employee->department_id) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Not authorized to view this complaint.',
+                    'message' => 'Access Denied. This complaint belongs to another department.',
                 ], 403);
             }
         }
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'id'              => $complain->id,
-                'complain_number' => $complain->complain_number,
-                'title'           => $complain->title,
-                'description'     => $complain->description,
-                'status'          => $complain->status,
-                'is_valid'        => $complain->is_valid,
-                'assigned_level'  => $complain->assigned_level,
-                'level_name'      => $complain->level_name,
-                'can_escalate'    => $complain->canEscalate(),
-                'submitted_at'    => $complain->created_at,
-                'resolved_at'     => $complain->resolved_at,
-                'user'            => [
-                    'id'       => $complain->user->id,
-                    'name'     => $complain->user->name,
-                    'phone'    => $complain->user->phone,
-                    'score'    => $complain->user->score,
-                    'priority' => $complain->user->score >= 10 ? 'High' : ($complain->user->score >= 5 ? 'Medium' : 'Low'),
-                ],
-                'authority'   => [
-                    'id'   => $complain->authority->id,
-                    'name' => $complain->authority->name,
-                ],
-                'department'  => [
-                    'id'   => $complain->department->id,
-                    'name' => $complain->department->name,
-                ],
-                'attachments' => $complain->attachments->map(function ($attachment) {
+            'data' => $this->formatComplainResponse($complain, true)
+        ], 200);
+    }
+
+    /**
+     * دالة موحدة لتنسيق رد الـ JSON (تمنع تكرار الكود وتسهل التعديل)
+     */
+    private function formatComplainResponse($complain, $withFullDetails = false)
+    {
+        $formatted = [
+            'id'              => $complain->id,
+            'complain_number' => $complain->complain_number,
+            'title'           => $complain->title,
+            'description'     => $complain->description,
+            'status'          => $complain->status,
+            'submitted_at'    => $complain->created_at->format('Y-m-d H:i'),
+            'resolved_at'     => $complain->resolved_at ? $complain->resolved_at->format('Y-m-d H:i') : null,
+            'user'            => [
+                'id'       => $complain->user->id,
+                'name'     => $complain->user->name,
+                'phone'    => $complain->user->phone,
+                'score'    => $complain->user->score,
+                'priority' => $complain->user->score >= 10 ? 'High' : ($complain->user->score >= 5 ? 'Medium' : 'Low'),
+            ],
+            'authority'       => ['id' => $complain->authority->id, 'name' => $complain->authority->name],
+            'department'      => ['id' => $complain->department->id, 'name' => $complain->department->name],
+            'attachments'     => $complain->attachments->map(function ($file) {
+                return [
+                    'id'        => $file->id,
+                    'url'       => asset('storage/' . $file->file_path),
+                    'file_type' => $file->file_type
+                ];
+            }),
+        ];
+
+        // إضافة المحادثة فقط في حال عرض الشكوى المفردة
+        if ($withFullDetails && $complain->chat) {
+            $formatted['chat'] = [
+                'id'       => $complain->chat->id,
+                'messages' => $complain->chat->messages->map(function ($msg) {
                     return [
-                        'id'        => $attachment->id,
-                        'file_path' => asset('storage/' . $attachment->file_path),
-                        'file_type' => $attachment->file_type,
+                        'message' => $msg->message,
+                        'sender'  => $msg->sender->name,
+                        'time'    => $msg->created_at->diffForHumans(),
                     ];
                 }),
-                'chat'        => $complain->chat ? [
-                    'chat_id'  => $complain->chat->id,
-                    'is_open'  => $complain->chat->is_open,
-                    'messages' => $complain->chat->messages->map(function ($message) {
-                        return [
-                            'id'        => $message->id,
-                            'message'   => $message->message,
-                            'file_path' => $message->file_path ? asset('storage/' . $message->file_path) : null,
-                            'sent_at'   => $message->sent_at,
-                            'sender'    => [
-                                'id'   => $message->sender->id,
-                                'name' => $message->sender->name,
-                            ],
-                        ];
-                    }),
-                ] : null,
-            ],
-        ], 200);
+            ];
+        }
+
+        return $formatted;
     }
 }
