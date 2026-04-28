@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import '../core/routes/app_routes.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -6,28 +7,26 @@ import '../services/auth_service.dart';
 class AuthController extends GetxController {
   final RxBool isLoading = false.obs;
   final Rxn<UserModel> currentUser = Rxn<UserModel>();
-  final AuthService _authService = AuthService();
 
-  Future<void> login(String name, String password) async {
-    print("محاولة تسجيل الدخول للمستخدم: $name");
+  final AuthService _authService = Get.find<AuthService>();
+  final GetStorage _storage = GetStorage();
+
+  String? tempEmail;
+
+  Future<void> login(String email, String password) async {
     isLoading.value = true;
     try {
-      final user = await _authService.login(name, password);
-      currentUser.value = user;
+      final user = await _authService.login(email, password);
 
-      Get.snackbar(
-        'نجاح',
-        'مرحباً بك مجدداً ${user.name}',
-        snackPosition: SnackPosition.TOP,
-      );
+      if (user != null) {
+        _saveUserSession(user);
+        currentUser.value = user;
 
-      Get.offAllNamed(Routes.HOME);
+        // التعديل: التوجه إلى الداشبورد (إدارة الشكاوي) مباشرة
+        Get.offAllNamed('/dashboard');
+      }
     } catch (e) {
-      Get.snackbar(
-        'فشل تسجيل الدخول',
-        _errorMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showError('فشل تسجيل الدخول', e);
     } finally {
       isLoading.value = false;
     }
@@ -42,7 +41,7 @@ class AuthController extends GetxController {
   }) async {
     isLoading.value = true;
     try {
-      final result = await _authService.register(
+      await _authService.register(
         name: name,
         email: email,
         password: password,
@@ -50,34 +49,71 @@ class AuthController extends GetxController {
         birthdate: birthdate,
       );
 
+      tempEmail = email;
+
+      _storage.write('isLoggedIn', true);
+      _storage.write('isEmailVerified', false);
+
       Get.snackbar(
         'تم إرسال الرمز',
-        'يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب',
+        'يرجى التحقق من بريدك الإلكتروني',
         snackPosition: SnackPosition.TOP,
       );
 
-      Get.offAllNamed(Routes.HOME);
+      Get.toNamed(Routes.OTP);
     } catch (e) {
-      String message = _errorMessage(e);
-      if (message.contains("1062")) {
-        message = "هذا البريد الإلكتروني مسجل مسبقاً";
-      }
-
-      Get.snackbar(
-        'خطأ في التسجيل',
-        message,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showError('خطأ في التسجيل', e);
     } finally {
       isLoading.value = false;
     }
   }
 
-  static String _errorMessage(Object e) {
-    final s = e.toString();
-    if (s.contains('Exception: ')) {
-      return s.replaceAll('Exception: ', '');
+  Future<void> verifyOtp(String code) async {
+    if (tempEmail == null) {
+      Get.snackbar("خطأ", "لم يتم العثور على البريد الإلكتروني");
+      return;
     }
-    return s;
+
+    isLoading.value = true;
+    try {
+      final bool isVerified = await _authService.verifyEmail(tempEmail!, code);
+
+      if (isVerified) {
+        _storage.write('isEmailVerified', true);
+
+        // ملاحظة: من الأفضل هنا تحديث بيانات المستخدم لتشمل الاسم في التخزين
+        // لكي يظهر في الداشبورد فوراً
+
+        Get.snackbar(
+          'نجاح',
+          'تم تفعيل حسابك، مرحباً بك في تطبيق إدارة الشكاوي',
+        );
+
+        // التعديل: الانتقال النهائي للداشبورد مع مسح الذاكرة للصفحات السابقة
+        Get.offAllNamed('/dashboard');
+      }
+    } catch (e) {
+      _showError('فشل التحقق', e);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void logout() {
+    _storage.erase();
+    currentUser.value = null;
+    Get.offAllNamed(Routes.LOGIN);
+  }
+
+  void _saveUserSession(UserModel user) {
+    _storage.write('isLoggedIn', true);
+    _storage.write('isEmailVerified', true);
+    _storage.write('user_data', user.toJson());
+  }
+
+  void _showError(String title, Object e) {
+    String message = e.toString().replaceAll('Exception: ', '');
+    if (message.contains("1062")) message = "هذا البريد مسجل مسبقاً";
+    Get.snackbar(title, message, snackPosition: SnackPosition.BOTTOM);
   }
 }

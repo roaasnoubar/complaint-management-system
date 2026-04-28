@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import '../models/user_model.dart';
 import 'base_client.dart';
 
-/// Authentication API (login / register) using [BaseClient.dio].
 class AuthService {
   AuthService({Dio? dio}) : _dio = dio ?? BaseClient.dio;
 
@@ -10,6 +9,7 @@ class AuthService {
 
   static const String _loginPath = 'auth/login';
   static const String _registerPath = 'auth/register';
+  static const String _verifyOtpPath = 'auth/verify-email';
 
   Future<UserModel> login(String name, String password) async {
     try {
@@ -56,6 +56,22 @@ class AuthService {
     }
   }
 
+  Future<bool> verifyEmail(String email, String code) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        _verifyOtpPath,
+        data: <String, dynamic>{'email': email, 'code': code},
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      }
+      return false;
+    } on DioException catch (e) {
+      throw Exception(BaseClient.handleError(e));
+    }
+  }
+
   static UserModel _parseUserFromResponse(Map<String, dynamic> data) {
     Map<String, dynamic>? userMap;
 
@@ -70,11 +86,11 @@ class AuthService {
       userMap = data;
     }
 
-    if (userMap == null)
+    if (userMap == null) {
       throw Exception('تعذر العثور على بيانات المستخدم في رد السيرفر');
+    }
 
     final normalized = Map<String, dynamic>.from(userMap);
-
     return UserModel.fromJson(normalized);
   }
 }
