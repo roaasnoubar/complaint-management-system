@@ -22,7 +22,6 @@ class AuthController extends GetxController {
         _saveUserSession(user);
         currentUser.value = user;
 
-        // التعديل: التوجه إلى الداشبورد (إدارة الشكاوي) مباشرة
         Get.offAllNamed('/dashboard');
       }
     } catch (e) {

@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 class BaseClient {
   BaseClient._();
 
-  static const String baseUrl = 'http://192.168.1.38:8000/api/';
+  static const String baseUrl = 'http://10.161.226.158:8000/api/';
 
   static const Duration _timeout = Duration(seconds: 20);
 

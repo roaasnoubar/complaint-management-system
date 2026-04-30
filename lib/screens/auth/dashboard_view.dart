@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/dashboard_controller.dart';
+import 'complaint_form_page.dart';
 
 class DashboardView extends GetView<DashboardController> {
   const DashboardView({super.key});
@@ -88,8 +89,9 @@ class DashboardView extends GetView<DashboardController> {
           Icons.edit_document,
           Colors.white,
           primary,
-          () {},
+          () => Get.to(() => ComplaintFormPage()),
         ),
+
         const SizedBox(height: 15),
         _actionButton("متابعة شكوى", Icons.search, dark, Colors.white, () {}),
       ],
