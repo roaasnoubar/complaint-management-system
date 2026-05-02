@@ -55,8 +55,9 @@ class Complain extends Model
      */
     public function canAccessChat($user): bool
     {
-        if (!$user) return false;
-
+        if (!$user || !$user->role) {
+            return false;
+        }
         // 1. إذا كانت الشكوى محلولة أو مرفوضة، يُغلق الشات للجميع
         if (in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_REJECTED])) {
             return false;
@@ -68,13 +69,13 @@ class Complain extends Model
         }
 
         // حساب الأيام منذ تاريخ الإسناد لهذا المستوى
-        $days = $this->assigned_at ? $this->assigned_at->diffInDays(now()) : 0;
-
+        $days = $this->created_at->diffInDays(now());
         // 3. صلاحيات الموظفين والمدراء بناءً على المستوى الحالي للشكوى
-        return match($user->role->level) {
-            3 => ($this->assigned_level == 3 && $days <= 5),  // موظف: أول 5 أيام
-            2 => ($this->assigned_level == 2 && $days <= 10), // مدير قسم: حتى اليوم 10
-            1 => ($this->assigned_level == 1),                // مدير الجهة: لا سقف زمني
+        return match($user->role?->level) {
+            3       => ($this->assigned_level == 3 && $days <= 5),
+            2       => ($this->assigned_level == 2 && $days <= 10),
+            1       => ($this->assigned_level == 1),
+            0       => true, // الأدمن غالباً له كامل الصلاحية
             default => false,
         };
     }
@@ -82,8 +83,11 @@ class Complain extends Model
     // Accessor لاستخدام الدالة في الـ API كحقل can_chat
     public function getCanChatAttribute(): bool
     {
-        return $this->canAccessChat(auth()->user());
-    }
+        $user = auth()->user();
+        if (!$user) return false;
+
+        return $this->canAccessChat($user);
+    } // تأكدي أن هذا القوس يغلق الدالة هنا فقط
 
     public function getCreatedAtHumanAttribute(): string
     {

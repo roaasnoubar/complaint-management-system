@@ -8,6 +8,8 @@ use App\Observers\ComplainObserver;
 use App\Observers\ChatMessageObserver;
 use App\Services\NotificationService;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Request;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,15 +20,18 @@ class AppServiceProvider extends ServiceProvider
     }
 
     public function boot(): void
-    {
-        // 1. مراقب الشكاوى
-        Complain::observe(ComplainObserver::class);
-
-        // 2. مراقب الرسائل (نستخدم ChatMessage فقط)
-        if (class_exists(ChatMessage::class)) {
-            ChatMessage::observe(ChatMessageObserver::class);
-        }
-        
-        // ملاحظة: قمت بحذف السطر الذي يحتوي على CantMessage لأنه يسبب الخطأ
+{
+    // 1. مراقبي النماذج (تأكدي أن الأسماء صحيحة)
+    if (class_exists(\App\Models\Complain::class)) {
+        \App\Models\Complain::observe(\App\Observers\ComplainObserver::class);
     }
+
+    // 2. المحرض التلقائي (Trigger)
+    // قمنا بإزالة شرط request()->is('api/*') مؤقتاً لضمان العمل 
+    try {
+        \Illuminate\Support\Facades\Artisan::call('escalate:complaints');
+    } catch (\Exception $e) {
+        // لا نفعل شيئاً في حال الخطأ
+    }
+}
 }

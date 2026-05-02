@@ -1,7 +1,4 @@
 <?php
-
-
-// تحديث كافة الاستدعاءات لتشمل مجلد Api
 use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthorityController;
 use App\Http\Controllers\Api\ComplainChatController;
@@ -11,8 +8,10 @@ use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
-use App\Http\Controllers\Api\DashboardController; // ضيفي هاد السطر كمان
+use App\Http\Controllers\Api\DashboardController; 
 use Illuminate\Support\Facades\Route;
+use App\Models\Complain;
+use Carbon\Carbon;
 
 // تأكدي أن الكنترولر مستدعى صح
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -45,3 +44,13 @@ Route::resource('roles', RoleController::class);
 
 // Permissions
 Route::resource('permissions', PermissionController::class);
+Route::get('/run-logic', function () {
+    $delay = Carbon::now('UTC')->subMinute(); 
+    
+    // تصعيد الشكاوى
+    $updated = Complain::where('assigned_level', 3)
+        ->where('created_at', '<=', $delay)
+        ->update(['assigned_level' => 2, 'updated_at' => now()]);
+
+    return "تم تصعيد $updated شكاوى بنجاح!";
+});

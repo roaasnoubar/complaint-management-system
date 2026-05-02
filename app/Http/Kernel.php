@@ -52,4 +52,5 @@ class Kernel extends HttpKernel
         // --- السطر الأهم لمشروعك الآن ---
         'role' => \App\Http\Middleware\CheckRole::class, 
     ];
+    
 }

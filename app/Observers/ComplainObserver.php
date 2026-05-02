@@ -65,18 +65,49 @@ class ComplainObserver
         // Escalation: assigned_level changed upward
         if ($complain->isDirty('assigned_level')) {
             $level = $complain->assigned_level;
-            $escalatedTo = match ($level) {
+            
+            // 1. تحديد اسم المستوى (لإشعار صاحب الشكوى)
+            $escalatedToName = match ($level) {
                 1       => 'Head of Organization',
                 2       => 'Department Manager',
                 3       => 'Employee',
                 default => 'a higher authority',
             };
-
+        
+            // 2. إشعار صاحب الشكوى
             $this->notificationService->escalated(
                 $complain->user_id,
                 $complain->title,
-                $escalatedTo
+                $escalatedToName
             );
+        
+            // 3. جلب مدير الجهة (جامعة الشام - Level 1)
+            // نبحث عنه في النظام كاملاً لأنه المسؤول الأعلى
+            $headOfOrg = \App\Models\User::whereHas('role', function ($q) {
+                $q->where('level', 1);
+            })->get();
+        
+            // 4. جلب مدير القسم (Level 2)
+            // نبحث عنه داخل نفس قسم الشكوى حصراً
+            $deptManagers = \App\Models\User::where('department_id', $complain->department_id)
+                ->whereHas('role', function ($q) {
+                    $q->where('level', 2);
+                })->get();
+        
+            // دمج الجميع في قائمة واحدة
+            $authorities = $headOfOrg->concat($deptManagers);
+        
+            \Log::info("Escalation: Notifying " . $authorities->count() . " administrators for Complaint #{$complain->id}");
+        
+            foreach ($authorities as $authority) {
+                $rankName = ($authority->role->level == 1) ? "University Administration" : "Department Manager";
+                
+                $this->notificationService->complaintAssigned(
+                    $authority->id,
+                    $complain->title,
+                    "Urgent: Complaint escalated to {$rankName}."
+                );
+            }
         }
     }
 }

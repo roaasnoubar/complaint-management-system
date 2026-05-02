@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Complain;
 use App\Models\Rating;
-use App\Models\Notification; // إضافة موديل الإشعارات
+use App\Models\Notification; 
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
@@ -37,9 +37,9 @@ class ComplaintController extends Controller
             'description'   => $request->description,
             'priority'      => $request->priority ?? 'normal',
             'status'        => 'Pending',
+            'assigned_level' => 3,
             // 'can_chat'   => false, // إذا كان عندك هذا الحقل في الجدول، اجعليه false افتراضياً
         ]);
-    
         // 3. رفع المرفقات
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
@@ -65,84 +65,105 @@ class ComplaintController extends Controller
      * جلب قائمة الشكاوى الخاصة بالمستخدم المسجل حالياً
      */
     public function index(Request $request): JsonResponse
-    {
-        $user = $request->user();
-        $now = \Carbon\Carbon::now();
-        
-        // جلب الشكاوى مع التحميل المسبق للعلاقات لضمان الأداء
-        $query = Complain::with(['authority:id,name', 'department:id,name', 'attachments', 'user:id,name']);
-    
-        // تطبيق منطق "من يرى ماذا" (الطلب الثالث: الإخفاء عند التصعيد)
-        
-        if ($user->role?->level === 1) { // مدير الجهة
-            // يرى الشكاوى التي مر عليها أكثر من 10 أيام (تصعدت له من مدير القسم)
-            $query->where('authority_id', $user->authority_id)
-                  ->where('created_at', '<=', $now->copy()->subDays(10));
-        } 
-        elseif ($user->role?->level === 2) { // مدير القسم
-            // يرى شكاوى قسمه التي لم تتجاوز الـ 10 أيام (لم تصل بعد لمدير الجهة)
-            $query->where('department_id', $user->department_id)
-                  ->where('created_at', '>', $now->copy()->subDays(10));
-        } 
-        elseif ($user->role?->level === 3) { // الموظف
-            // يرى شكاوى قسمه التي لم تتجاوز الـ 5 أيام (لم تصعد بعد لمدير القسم)
-            $query->where('department_id', $user->department_id)
-                  ->where('created_at', '>', $now->copy()->subDays(5));
-        } 
-        else { // المستخدم العادي (مقدم الشكوى)
-            $query->where('user_id', $user->id);
-        }
-    
-        $complaints = $query->orderBy('created_at', 'desc')->get();
-    
-        // إضافة منطق "إمكانية فتح الشات" لكل شكوى بناءً على الزمن (الطلبات 1، 2، 3)
-        $complaints->transform(function ($complaint) use ($user, $now) {
-            $daysOld = $complaint->created_at->diffInDays($now);
-            $complaint->can_chat = false;
-    
-            // 1. الموظف: يفتح شات في أول 5 أيام فقط
-            if ($user->role?->level === 3 && $daysOld <= 5) {
-                $complaint->can_chat = true;
-            }
-            // 2. مدير القسم: يفتح شات طالما الشكوى لم تتجاوز 10 أيام
-            elseif ($user->role?->level === 2 && $daysOld <= 10) {
-                $complaint->can_chat = true;
-            }
-            // 3. مدير الجهة: يفتح شات فقط بعد اليوم العاشر (عندما تصعد إليه)
-            elseif ($user->role?->level === 1 && $daysOld > 10) {
-                $complaint->can_chat = true;
-            }
-            // 4. مقدم الشكوى: يمكنه الرد دائماً إذا فُتحت المحادثة
-            elseif ($user->role?->level === 4) { // بافتراض أن ليفل المستخدم هو 4
-                $complaint->can_chat = true;
-            }
-    
-            return $complaint;
-        });
-    
-        return response()->json([
-            'success' => true,
-            'count'   => $complaints->count(),
-            'data'    => $complaints
-        ], 200);
+{
+    $user = $request->user();
+    $now = \Carbon\Carbon::now();
+
+    // 1. تحديث شامل لقاعدة البيانات (التصعيد التلقائي) قبل جلب البيانات
+    // تصعيد لمدير الجهة (1) إذا مر أكثر من دقيقتين
+    \DB::table('complains')
+        ->where('created_at', '<=', $now->copy()->subMinutes(2))
+        ->where('assigned_level', '>', 1)
+        ->update(['assigned_level' => 1, 'updated_at' => $now]);
+
+    // تصعيد لمدير القسم (2) إذا مر أكثر من دقيقة (وأقل من دقيقتين)
+    \DB::table('complains')
+        ->where('created_at', '<=', $now->copy()->subMinutes(1))
+        ->where('created_at', '>', $now->copy()->subMinutes(2))
+        ->where('assigned_level', '>', 2)
+        ->update(['assigned_level' => 2, 'updated_at' => $now]);
+
+    // 2. بناء الاستعلام بناءً على المستويات المحدثة
+    $query = Complain::with(['authority:id,name', 'department:id,name', 'attachments', 'user:id,name']);
+
+    if ($user->role?->level === 1) { // مدير الجهة
+        $query->where('authority_id', $user->authority_id)
+              ->where('assigned_level', 1);
+    } 
+    elseif ($user->role?->level === 2) { // مدير القسم
+        $query->where('department_id', $user->department_id)
+              ->where('assigned_level', 2);
+    } 
+    elseif ($user->role?->level === 3) { // الموظف
+        $query->where('department_id', $user->department_id)
+              ->where('assigned_level', 3);
+    } 
+    else {
+        $query->where('user_id', $user->id);
     }
+
+    $complaints = $query->orderBy('created_at', 'desc')->get();
+
+    // 3. إضافة الحقول الوهمية للعرض (JSON)
+    $complaints->transform(function ($complaint) use ($user, $now) {
+        $minutesOld = $complaint->created_at->diffInMinutes($now);
+        $complaint->can_chat = false;
+
+        // منطق الشات: مسموح فقط للمستوى الذي تتبع له الشكوى حالياً
+        if ($user->role?->level == $complaint->assigned_level) {
+            $complaint->can_chat = true;
+        }
+        // المواطن دائماً يمكنه الشات (أو حسب منطق مشروعك)
+        elseif ($user->role?->level === 4 || !$user->role) {
+            $complaint->can_chat = true;
+        }
+
+        $complaint->current_level_name = match((int)$complaint->assigned_level) {
+            1 => 'Authority Manager',
+            2 => 'Department Manager',
+            3 => 'Employee',
+            default => 'Unknown'
+        };
+
+        return $complaint;
+    });
+
+    return response()->json([
+        'success' => true,
+        'count'   => $complaints->count(),
+        'data'    => $complaints
+    ], 200);
+}
     /**
      * عرض تفاصيل شكوى واحدة محددة للمستخدم
      */
     public function show(Complain $complain): JsonResponse
-    {
-        if ($complain->user_id != auth()->id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'غير مصرح لك بمشاهدة هذه الشكوى'
-            ], 403);
-        }
+{
+    $user = auth()->user();
 
+    // السماح إذا كان هو صاحب الشكوى OR إذا كان موظفاً/مديراً (Role level 1, 2, 3)
+    $isOwner = $complain->user_id == $user->id;
+    $isStaff = in_array($user->role?->level, [1, 2, 3]);
+
+    if (!$isOwner && !$isStaff) {
         return response()->json([
-            'success' => true,
-            'data'    => $complain->load(['user:id,name', 'authority', 'department', 'attachments', 'chat.messages'])
-        ]);
+            'success' => false,
+            'message' => 'غير مصرح لك بمشاهدة هذه الشكوى'
+        ], 403);
     }
+
+    // هنا السحر: جلب الشكوى مع كل شيء (المواطن، الجهة، القسم، المرفقات، والمحادثة برسائلها)
+    return response()->json([
+        'success' => true,
+        'data'    => $complain->load([
+            'user:id,name', 
+            'authority', 
+            'department', 
+            'attachments', 
+            'chat.messages.sender' // أضفت sender لتعرفي من أرسل كل رسالة في الشات
+        ])
+    ]);
+}
 
     /**
      * تقييم المستخدم للجهة بعد حل الشكوى
@@ -204,8 +225,7 @@ class ComplaintController extends Controller
     $nextStatus = $request->input('status');
     $notes = $request->input('notes');
 
-    // 2. قفل الأمان (Security Gate) 
-    // تأكدي أن الموظف ليس أدمن وأنه يحاول الوصول لشكوى من قسمه فقط
+    //(Security Gate) +
     if (!$user->isAdmin()) {
         if ($complain->department_id != $user->department_id) {
             return response()->json([
@@ -294,5 +314,22 @@ private function sendStatusNotification($complain, $nextStatus, $oldStatus, $not
             );
             break;
     }
+}
+// داخل الملف تأكدي من وجود هذه الدالة:
+public function escalateToManager($id) 
+{
+    // حذفنا حرف الـ t من نهاية الاسم ليتطابق مع ملفك Complain.php
+    $complaint = \App\Models\Complain::find($id); 
+
+    if (!$complaint) {
+        return response()->json(['error' => 'الشكوى غير موجودة'], 404);
+    }
+
+    $complaint->update(['assigned_level' => 2]);
+
+    return response()->json([
+        'message' => 'تم التصعيد بنجاح',
+        'complaint_id' => $complaint->id
+    ]);
 }
 }

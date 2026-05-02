@@ -12,11 +12,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // --- تسجيل الميدل وير هنا ---
+        // تسجيل الميدل وير
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
-    })->create();
+    })
+    // تأكدي أن السهم -> موجود قبل كلمة withCommands
+    ->create();
