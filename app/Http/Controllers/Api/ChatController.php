@@ -4,7 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ComplainChat;
-use App\Models\ChatMessage; // تأكدي أن اسم الموديل ChatMessage (أو غيريه لـ CantMessage حسب ملفك)
+use App\Models\ChatMessage; 
+use App\Http\Resources\ChatMessageResource;
 use App\Models\Complain;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -44,21 +45,11 @@ class ChatController extends Controller
                 'chat_id'     => $chat->id,
                 'complain_id' => $chat->complain_id,
                 'is_open'     => $chat->is_open,
-                'can_send'    => $complain->canAccessChat($user), // هام جداً للأندرويد لإظهار/إخفاء زر الإرسال
-                'messages'    => $chat->messages->map(function ($message) {
-                    return [
-                        'id'        => $message->id,
-                        'message'   => $message->message,
-                        // تحويل مسار الملف إلى رابط كامل ليفتح في الأندرويد
-                        'file_url'  => $message->file_path ? asset('storage/' . $message->file_path) : null,
-                        'file_type' => $message->file_type,
-                        'sent_at'   => $message->sent_at,
-                        'sender'    => [
-                            'id'   => $message->sender->id,
-                            'name' => $message->sender->name,
-                        ],
-                    ];
-                }),
+                'can_send'    => $complain->canAccessChat($user),
+                
+                // --- السطر الجديد والمختصر باستخدام الـ Resource ---
+                'messages'    => ChatMessageResource::collection($chat->messages),
+                // --------------------------------------------------
             ],
         ], 200);
     }

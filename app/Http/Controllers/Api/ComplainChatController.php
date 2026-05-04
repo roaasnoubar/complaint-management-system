@@ -84,4 +84,21 @@ class ComplainChatController extends Controller
             'message' => 'تم إغلاق الدردشة بنجاح.'
         ]);
     }
+    public function markAsRead($complainId)
+{
+    $user = auth()->user();
+
+    // تحديث الرسائل التي لم يرسلها المستخدم الحالي لتصبح مقروءة
+    \App\Models\ChatMessage::whereHas('chat', function ($query) use ($complainId) {
+        $query->where('complain_id', $complainId);
+    })
+    ->where('sender_id', '!=', $user->id)
+    ->where('is_read', false)
+    ->update(['is_read' => true]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'تم تحديث حالة الرسائل إلى مقروءة بنجاح.'
+    ]);
+}
 }
