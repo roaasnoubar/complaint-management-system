@@ -163,6 +163,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/send-message/{complainId}', [ChatController::class, 'sendMessage']); 
         Route::get('/all', [ChatController::class, 'getAllChats']);
         Route::post('/open/{complainId}', [ChatController::class, 'openChat']);
+        Route::post('/read/{complainId}', [ChatController::class, 'markAsRead']);
     });
 
     // --- 6. الإحصائيات (Dashboard) ---

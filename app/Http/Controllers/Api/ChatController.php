@@ -171,4 +171,21 @@ public function openChat(Request $request, $complainId)
         'chat' => $chat
     ]);
 }
+public function markAsRead($complainId)
+{
+    $user = auth()->user();
+
+    // تحديث كافة الرسائل المرسلة من الطرف الآخر لتصبح "مقروءة"
+    \App\Models\ChatMessage::whereHas('chat', function ($query) use ($complainId) {
+        $query->where('complain_id', $complainId);
+    })
+    ->where('sender_id', '!=', $user->id) // فقط الرسائل التي لم يرسلها المستخدم الحالي
+    ->where('is_read', false)
+    ->update(['is_read' => true]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'تم تحديث حالة الرسائل إلى مقروءة.'
+    ]);
+}
 }
