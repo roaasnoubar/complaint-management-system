@@ -6,16 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Carbon\Carbon;
 
 class Complain extends Model
 {
     protected $table = 'complains';
 
     protected $fillable = [
+        'full_name',   
         'complain_number',
         'user_id',
-        'auth_id',
+        'authority_id',
         'department_id',
+        'priority', 
         'current_department_id',
         'title',
         'description',
@@ -26,6 +29,9 @@ class Complain extends Model
         'resolved_at',
     ];
 
+    // إضافة الحقول الوهمية للـ JSON لسهولة التعامل مع الأندرويد
+    protected $appends = ['created_at_human', 'level_name', 'can_chat'];
+
     protected $casts = [
         'resolved_at' => 'datetime',
         'assigned_at' => 'datetime',
@@ -35,95 +41,57 @@ class Complain extends Model
     const STATUS_PENDING     = 'Pending';
     const STATUS_IN_PROGRESS = 'In Progress';
     const STATUS_RESOLVED    = 'Resolved';
-
-    const LEVEL_EMPLOYEE = 3;
-    const LEVEL_MANAGER  = 2;
-    const LEVEL_HEAD     = 1;
-
-    const ESCALATION_DAYS = 5;
+    const STATUS_REJECTED    = 'Rejected';
 
     const STATUS_TRANSITIONS = [
-        'Pending'     => 'In Progress',
-        'In Progress' => 'Resolved',
+        self::STATUS_PENDING     => [self::STATUS_IN_PROGRESS, self::STATUS_REJECTED],
+        self::STATUS_IN_PROGRESS => [self::STATUS_RESOLVED, self::STATUS_REJECTED],
+        self::STATUS_RESOLVED    => [],
+        self::STATUS_REJECTED    => [],
     ];
 
-    protected static function booted(): void
+    /**
+     * دالة التحقق من صلاحية المراسلة (كاملة لكل المستويات)
+     */
+    public function canAccessChat($user): bool
     {
-        static::creating(function (Complain $complain) {
-            $complain->complain_number = self::generateComplainNumber();
-        });
+        if (!$user || !$user->role) {
+            return false;
+        }
+        // 1. إذا كانت الشكوى محلولة أو مرفوضة، يُغلق الشات للجميع
+        if (in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_REJECTED])) {
+            return false;
+        }
 
-        static::created(function (Complain $complain) {
-            ComplainChat::create([
-                'complain_id' => $complain->id,
-                'user_id'     => $complain->user_id,
-                'is_open'     => true,
-            ]);
-        });
+        // 2. صاحب الشكوى (Level 4 / User)
+        if ($user->id === $this->user_id) {
+            return true;
+        }
 
-        static::updated(function (Complain $complain) {
-            if ($complain->status === self::STATUS_RESOLVED) {
-                $chat = ComplainChat::where('complain_id', $complain->id)->first();
-                if ($chat && $chat->is_open) {
-                    $chat->update([
-                        'is_open'   => false,
-                        'closed_at' => now(),
-                    ]);
-                }
-            }
-        });
+        // حساب الأيام منذ تاريخ الإسناد لهذا المستوى
+        $days = $this->created_at->diffInDays(now());
+        // 3. صلاحيات الموظفين والمدراء بناءً على المستوى الحالي للشكوى
+        return match($user->role?->level) {
+            3       => ($this->assigned_level == 3 && $days <= 5),
+            2       => ($this->assigned_level == 2 && $days <= 10),
+            1       => ($this->assigned_level == 1),
+            0       => true, // الأدمن غالباً له كامل الصلاحية
+            default => false,
+        };
     }
 
-    public static function generateComplainNumber(): string
+    // Accessor لاستخدام الدالة في الـ API كحقل can_chat
+    public function getCanChatAttribute(): bool
     {
-        $year        = now()->year;
-        $last        = self::orderBy('id', 'desc')->first();
-        $nextNumber  = $last ? ($last->id + 1) : 1;
-        return 'CMP-' . $year . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
-    }
+        $user = auth()->user();
+        if (!$user) return false;
 
-    public function user(): BelongsTo
+        return $this->canAccessChat($user);
+    } // تأكدي أن هذا القوس يغلق الدالة هنا فقط
+
+    public function getCreatedAtHumanAttribute(): string
     {
-        return $this->belongsTo(User::class);
-    }
-
-    public function authority(): BelongsTo
-    {
-        return $this->belongsTo(Authority::class, 'auth_id');
-    }
-
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class);
-    }
-
-    public function currentDepartment(): BelongsTo
-    {
-        return $this->belongsTo(Department::class, 'current_department_id');
-    }
-
-    public function attachments(): HasMany
-    {
-        return $this->hasMany(Attachment::class, 'complain_id');
-    }
-
-    public function chat(): HasOne
-    {
-        return $this->hasOne(ComplainChat::class, 'complain_id');
-    }
-
-    public function rattings(): HasMany
-    {
-        return $this->hasMany(Ratting::class, 'complain_id');
-    }
-
-    public function canEscalate(): bool
-    {
-        if ($this->status === self::STATUS_RESOLVED) return false;
-        if ($this->assigned_level <= self::LEVEL_HEAD) return false;
-
-        $assignedAt = $this->assigned_at ?? $this->created_at;
-        return $assignedAt->diffInDays(now()) >= self::ESCALATION_DAYS;
+        return $this->created_at->diffForHumans();
     }
 
     public function getLevelNameAttribute(): string
@@ -135,4 +103,60 @@ class Complain extends Model
             default => 'Unknown',
         };
     }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Complain $complain) {
+            $complain->complain_number = self::generateComplainNumber();
+            if (empty($complain->assigned_level)) {
+                $complain->assigned_level = 3;
+            }
+            $complain->assigned_at = now();
+            if (empty($complain->current_department_id)) {
+                $complain->current_department_id = $complain->department_id;
+            }
+        });
+
+        static::created(function (Complain $complain) {
+            if (class_exists(ComplainChat::class)) {
+                ComplainChat::create([
+                    'complain_id' => $complain->id,
+                    'user_id'     => $complain->user_id,
+                    'is_open'     => true,
+                ]);
+            }
+        });
+
+        static::updated(function (Complain $complain) {
+            if (in_array($complain->status, [self::STATUS_RESOLVED, self::STATUS_REJECTED])) {
+                $chat = ComplainChat::where('complain_id', $complain->id)->first();
+                if ($chat && $chat->is_open) {
+                    $chat->update([
+                        'is_open'   => false,
+                        'closed_at' => now(),
+                    ]);
+                }
+                if (is_null($complain->resolved_at)) {
+                    $complain->updateQuietly(['resolved_at' => now()]);
+                }
+            }
+        });
+    }
+
+    public static function generateComplainNumber(): string
+    {
+        $year       = now()->year;
+        $last       = self::orderBy('id', 'desc')->first();
+        $nextNumber = $last ? ($last->id + 1) : 1;
+        return 'CMP-' . $year . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+    }
+
+    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function authority()
+{
+    return $this->belongsTo(Authority::class, 'authority_id');
+}
+    public function department(): BelongsTo { return $this->belongsTo(Department::class); }
+    public function attachments(): HasMany { return $this->hasMany(Attachment::class, 'complain_id'); }
+    public function chat(): HasOne { return $this->hasOne(ComplainChat::class, 'complain_id'); }
 }
