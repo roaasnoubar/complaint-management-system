@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ComplainChatController;
 use App\Models\Complain;
 use Carbon\Carbon;
 
