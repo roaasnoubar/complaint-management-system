@@ -39,7 +39,7 @@ class AuthController extends Controller
             'verification_expires_at' => now()->addMinutes(10),
             'is_verified'             => false,
             'role_id'                 => 3, 
-            'authority_id'            => 1, 
+            'authority_id'            => null, 
             'score'                   => 0,
             'is_active'               => true,
             'is_banned'               => false,
