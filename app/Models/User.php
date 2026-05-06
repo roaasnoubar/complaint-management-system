@@ -81,7 +81,7 @@ class User extends Authenticatable
     public function isManager(): bool
     {
         if (!$this->role) return false;
-        return $this->role->name === 'manager' || $this->role->level === 1;
+        return $this->role->name === 'authority_manager' || $this->role->level === 1;
     }
 
     // هذه الدالة مهمة جداً لأن رسالة الخطأ تشير إليها بالاسم

@@ -45,12 +45,32 @@ Route::resource('roles', RoleController::class);
 // Permissions
 Route::resource('permissions', PermissionController::class);
 Route::get('/run-logic', function () {
-    $delay = Carbon::now('UTC')->subMinute(); 
+    $now = Carbon::now('UTC');
+    $delay = $now->copy()->subMinute(); // حد الدقيقة الواحدة
     
-    // تصعيد الشكاوى
-    $updated = Complain::where('assigned_level', 3)
-        ->where('created_at', '<=', $delay)
-        ->update(['assigned_level' => 2, 'updated_at' => now()]);
+    // 1. تصعيد من الموظف (3) إلى مدير القسم (2)
+    $toManager = Complain::where('assigned_level', 3)
+        ->where('assigned_at', '<=', $delay) // استخدمنا assigned_at لضمان الدقة
+        ->update([
+            'assigned_level' => 2,
+            'assigned_at' => $now, // تحديث الوقت لتبدأ دقيقة المدير الجديد من الآن
+            'updated_at' => $now
+        ]);
 
-    return "تم تصعيد $updated شكاوى بنجاح!";
+    // 2. تصعيد من مدير القسم (2) إلى مدير الجهة (1)
+    $toAuthority = Complain::where('assigned_level', 2)
+        ->where('assigned_at', '<=', $delay)
+        ->update([
+            'assigned_level' => 1,
+            'assigned_at' => $now,
+            'updated_at' => $now
+        ]);
+
+    return response()->json([
+        'status' => 'success',
+        'message' => 'تمت عملية التصعيد بنجاح',
+        'escalated_to_manager' => $toManager,
+        'escalated_to_authority' => $toAuthority,
+        'current_time' => $now->toDateTimeString()
+    ]);
 });

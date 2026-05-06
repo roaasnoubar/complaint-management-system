@@ -83,41 +83,46 @@ class ComplaintController extends Controller
         ->where('assigned_level', '>', 2)
         ->update(['assigned_level' => 2, 'updated_at' => $now]);
 
-    // 2. بناء الاستعلام بناءً على المستويات المحدثة
+    // 2. بناء الاستعلام بناءً على الصلاحيات
     $query = Complain::with(['authority:id,name', 'department:id,name', 'attachments', 'user:id,name']);
 
-    if ($user->role?->level === 1) { // مدير الجهة
+    if ($user->role?->level === 1) { // مدير الجهة (Authority Manager)
         $query->where('authority_id', $user->authority_id)
               ->where('assigned_level', 1);
     } 
-    elseif ($user->role?->level === 2) { // مدير القسم
-        $query->where('department_id', $user->department_id)
-              ->where('assigned_level', 2);
+    elseif ($user->role?->level === 2) { // مدير القسم (Department Manager)
+        // تعديل: يرى كل شكاوى قسمه بغض النظر عن المستوى الإداري للشكوى
+        $query->where('department_id', $user->department_id);
     } 
-    elseif ($user->role?->level === 3) { // الموظف
+    elseif ($user->role?->level === 3) { // الموظف (Employee)
         $query->where('department_id', $user->department_id)
               ->where('assigned_level', 3);
     } 
-    else {
+    else { // المواطن (Citizen)
         $query->where('user_id', $user->id);
     }
 
     $complaints = $query->orderBy('created_at', 'desc')->get();
 
-    // 3. إضافة الحقول الوهمية للعرض (JSON)
+    // 3. إضافة الحقول الوهمية ومعالجة البيانات للعرض
     $complaints->transform(function ($complaint) use ($user, $now) {
-        $minutesOld = $complaint->created_at->diffInMinutes($now);
         $complaint->can_chat = false;
 
-        // منطق الشات: مسموح فقط للمستوى الذي تتبع له الشكوى حالياً
-        if ($user->role?->level == $complaint->assigned_level) {
+        // منطق الشات:
+        // 1. مدير القسم يمكنه الشات في أي شكوى داخل قسمه لم تُحل بعد
+        if ($user->role?->level === 2 && $complaint->status !== 'Resolved') {
             $complaint->can_chat = true;
         }
-        // المواطن دائماً يمكنه الشات (أو حسب منطق مشروعك)
+        // 2. المستويات الأخرى (موظف، مدير عام) تشات فقط إذا كانت الشكوى في مستواهم حالياً
+        elseif ($user->role?->level == $complaint->assigned_level) {
+            $complaint->can_chat = true;
+        }
+        // 3. المواطن دائماً يمكنه الشات في شكاويه
         elseif ($user->role?->level === 4 || !$user->role) {
             $complaint->can_chat = true;
         }
 
+        // تحديد مسمى المستوى الإداري الحالي للشكوى
         $complaint->current_level_name = match((int)$complaint->assigned_level) {
             1 => 'Authority Manager',
             2 => 'Department Manager',
@@ -125,9 +130,13 @@ class ComplaintController extends Controller
             default => 'Unknown'
         };
 
+        // إضافة حقل للوقت المنقضي بشكل نصي (اختياري للفرونت إند)
+        $complaint->created_at_human = $complaint->created_at->diffForHumans();
+
         return $complaint;
     });
 
+    // 4. إرجاع الرد النهائي
     return response()->json([
         'success' => true,
         'count'   => $complaints->count(),
@@ -137,13 +146,26 @@ class ComplaintController extends Controller
     /**
      * عرض تفاصيل شكوى واحدة محددة للمستخدم
      */
-    public function show(Complain $complain): JsonResponse
+    public function show($id): JsonResponse
 {
     $user = auth()->user();
 
-    // السماح إذا كان هو صاحب الشكوى OR إذا كان موظفاً/مديراً (Role level 1, 2, 3)
+    // 1. جلب الشكوى يدوياً مع تحميل كافة العلاقات والبيانات المرتبطة
+    // استخدمنا find() لضمان جلب السجل المطلوب بدقة من قاعدة البيانات
+    $complain = \App\Models\Complain::with(['user', 'authority', 'department', 'attachments', 'chat.messages.sender'])
+        ->find($id);
+
+    // 2. التحقق من وجود الشكوى في قاعدة البيانات
+    if (!$complain) {
+        return response()->json([
+            'success' => false,
+            'message' => 'الشكوى غير موجودة'
+        ], 404);
+    }
+
+    // 3. التحقق من الصلاحيات
     $isOwner = $complain->user_id == $user->id;
-    $isStaff = in_array($user->role?->level, [1, 2, 3]);
+    $isStaff = in_array($user->role?->level, [0, 1, 2, 3]); // أضفت المستوى 0 للأدمن احتياطاً
 
     if (!$isOwner && !$isStaff) {
         return response()->json([
@@ -152,16 +174,19 @@ class ComplaintController extends Controller
         ], 403);
     }
 
-    // هنا السحر: جلب الشكوى مع كل شيء (المواطن، الجهة، القسم، المرفقات، والمحادثة برسائلها)
+    // 1. تحميل العلاقات أولاً على الكائن الحالي
+    $complain->load([
+        'user:id,name', 
+        'authority', 
+        'department', 
+        'attachments', 
+        'chat.messages.sender'
+    ]);
+
+    // 2. الآن نعيد الاستجابة، ستكون العلاقات موجودة والـ Appends (مثل level_name) ستجد البيانات لتعمل
     return response()->json([
         'success' => true,
-        'data'    => $complain->load([
-            'user:id,name', 
-            'authority', 
-            'department', 
-            'attachments', 
-            'chat.messages.sender' // أضفت sender لتعرفي من أرسل كل رسالة في الشات
-        ])
+        'data'    => $complain
     ]);
 }
 
@@ -271,7 +296,7 @@ class ComplaintController extends Controller
     return response()->json([
         'success' => true,
         'message' => 'تم تحديث الحالة بنجاح وإرسال التنبيهات اللازمة.',
-        'data' => $complain->load('user')
+        'data' => $complain->refresh()->load('user') // قمنا بإضافة refresh لضمان ظهور الـ notes والبيانات الجديدة
     ]);
 }
 /**
