@@ -153,8 +153,9 @@ class ComplaintController extends Controller
     // 1. جلب الشكوى يدوياً مع تحميل كافة العلاقات والبيانات المرتبطة
     // استخدمنا find() لضمان جلب السجل المطلوب بدقة من قاعدة البيانات
     $complain = \App\Models\Complain::with(['user', 'authority', 'department', 'attachments', 'chat.messages.sender'])
-        ->find($id);
-
+    ->where('id', $id)
+    ->orWhere('complain_number', $id) 
+    ->first();
     // 2. التحقق من وجود الشكوى في قاعدة البيانات
     if (!$complain) {
         return response()->json([
