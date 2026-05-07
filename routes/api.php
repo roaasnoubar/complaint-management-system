@@ -125,6 +125,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me',      [AuthController::class, 'me']);
+        
     });
 
     // --- 1. الأدمن العام (Super Admin) ---
@@ -157,6 +158,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // --- 4. نظام الشكاوى (المستخدم العادي) ---
+    Route::get('/departments', [DepartmentController::class, 'index']); 
     Route::post('/complaints', [ComplaintController::class, 'store']); 
     Route::get('/my-complaints', [ComplaintController::class, 'userComplaints']);
     Route::get('/complaints/{id}', [ComplaintController::class, 'show']); 
