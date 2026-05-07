@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ComplainChatController;
 use App\Models\Complain;
 use Carbon\Carbon;
 
@@ -41,28 +42,31 @@ Route::get('/escalate-complaints', function () {
 
     // 1. تصعيد إلى مدير الجهة (Level 1)
     $toAuthority = \App\Models\Complain::where('assigned_level', 2)
-        ->where('updated_at', '<=', $delay)
+    ->where('assigned_at', '<=', $delay)
         ->with('department')
         ->get();
 
     foreach ($toAuthority as $complaint) {
         $complaint->update([
             'assigned_level' => 1,
+            'assigned_at' => now(),
             'updated_at' => now()
         ]);
     }
 
     // 2. تصعيد إلى مدير القسم (Level 2)
     $toManager = \App\Models\Complain::where('assigned_level', 3)
-        ->where('created_at', '<=', $delay)
+    ->where('assigned_at', '<=', $delay)
         ->with('department')
         ->get();
 
     foreach ($toManager as $complaint) {
         $complaint->update([
             'assigned_level' => 2,
+            'assigned_at' => now(),
             'updated_at' => now()
         ]);
+
     }
 
     $totalCount = $toAuthority->count() + $toManager->count();
@@ -116,7 +120,7 @@ Route::get('/escalate-complaints', function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth:sanctum')->group(function () {
-
+    
     // --- حساب المستخدم ---
     Route::prefix('auth')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -124,38 +128,38 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // --- 1. الأدمن العام (Super Admin) ---
-    Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
         Route::post('/create-user', [UserManagementController::class, 'store'])
-             ->middleware('role:admin,manager'); 
-             
-        Route::apiResource('authorities', AuthorityController::class)->middleware('role:admin');
+              ->middleware('role:admin,authority_manager'); // تأكدي من مسمى الدور لديكِ (manager أم authority_manager)
+              
+        Route::apiResource('authorities', AuthorityController::class)
+              ->names('admin.authorities')
+              ->middleware('role:admin');
+    
         Route::get('/users', [UserManagementController::class, 'index']);
     });
+  
 
-    // --- 2. مدير الجهة (Authority Management) ---
-    Route::prefix('manager')->middleware(['role:manager'])->group(function () {
+    Route::prefix('manager')->middleware(['auth:sanctum', 'role:manager,dept_manager'])->group(function () {
         Route::get('/my-departments', [DepartmentController::class, 'index']); 
-        
-        // تعديل: تم توجيه الطلب إلى UserManagementController لأن AuthorityManager غير موجود
         Route::post('/create-employee', [UserManagementController::class, 'store']);
-        
         Route::get('/statistics', [DashboardController::class, 'getAuthorityStats']);
+            Route::get('/complaints', [ComplaintController::class, 'index']); 
+        Route::get('/complaints/{id}', [ComplaintController::class, 'show']);
     });
-
     // --- 3. نظام الشكاوى (الموظف) ---
     Route::prefix('employee')->middleware(['auth:sanctum', 'role:employee,dept_manager,authority_manager,admin'])->group(function () {
-        Route::get('/complaints', [EmployeeComplaintController::class, 'getComplaints']);
-        Route::get('/complaints/{id}', [EmployeeComplaintController::class, 'getComplaint']);
-        Route::put('/complaints/{id}/status', [ComplaintProcessingController::class, 'updateStatus']);
-        Route::get('/complaints', [ComplaintController::class, 'index']);
-        Route::get('/complaints/{complain}', [ComplaintController::class, 'show']);
-        Route::apiResource('complaints', ComplaintController::class);
+        Route::get('/list', [EmployeeComplaintController::class, 'getComplaints'])->name('employee.complaints.list');
+        Route::get('/view/{id}', [EmployeeComplaintController::class, 'getComplaint'])->name('employee.complaints.view');
+        Route::apiResource('manage-complaints', ComplaintController::class)
+              ->names('employee.manage.complaints')
+              ->only(['index', 'show']);
     });
 
     // --- 4. نظام الشكاوى (المستخدم العادي) ---
     Route::post('/complaints', [ComplaintController::class, 'store']); 
     Route::get('/my-complaints', [ComplaintController::class, 'userComplaints']);
-
+    Route::get('/complaints/{id}', [ComplaintController::class, 'show']); 
     // --- 5. نظام المحادثة (Chat API) ---
     Route::prefix('chat')->group(function () {
         Route::get('/complaints/{complainId}', [ChatController::class, 'getChat']); 
@@ -163,6 +167,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/send-message/{complainId}', [ChatController::class, 'sendMessage']); 
         Route::get('/all', [ChatController::class, 'getAllChats']);
         Route::post('/open/{complainId}', [ChatController::class, 'openChat']);
+        Route::post('/read/{complainId}', [ComplainChatController::class, 'markAsRead']); 
     });
 
     // --- 6. الإحصائيات (Dashboard) ---
@@ -197,5 +202,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/conversations/{id}/messages', [ConversationController::class, 'getMessages']);
     });
     
-
+Route::middleware(['auth:sanctum', 'role:admin,authority_manager,dept_manager,employee'])->group(function () {
+    Route::post('/complaints/{id}/status', [ComplaintProcessingController::class, 'updateStatus']);
+    Route::post('/complaints/{id}/reject', [ComplaintProcessingController::class, 'reject']);
+});
 });

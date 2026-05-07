@@ -33,10 +33,13 @@ class Complain extends Model
     protected $appends = ['created_at_human', 'level_name', 'can_chat'];
 
     protected $casts = [
+        'created_at'  => 'datetime',
+        'updated_at'  => 'datetime',
         'resolved_at' => 'datetime',
         'assigned_at' => 'datetime',
         'is_valid'    => 'boolean',
     ];
+    protected $with = ['user', 'authority', 'department'];
 
     const STATUS_PENDING     = 'Pending';
     const STATUS_IN_PROGRESS = 'In Progress';
@@ -69,11 +72,10 @@ class Complain extends Model
         }
 
         // حساب الأيام منذ تاريخ الإسناد لهذا المستوى
-        $days = $this->created_at->diffInDays(now());
-        // 3. صلاحيات الموظفين والمدراء بناءً على المستوى الحالي للشكوى
+        $minutes = $this->assigned_at ? $this->assigned_at->diffInMinutes(now()) : 0;        
         return match($user->role?->level) {
-            3       => ($this->assigned_level == 3 && $days <= 5),
-            2       => ($this->assigned_level == 2 && $days <= 10),
+            3       => ($this->assigned_level == 3 && $minutes <= 1),
+            2       => ($this->assigned_level == 2 && $minutes <= 1),
             1       => ($this->assigned_level == 1),
             0       => true, // الأدمن غالباً له كامل الصلاحية
             default => false,
@@ -91,18 +93,21 @@ class Complain extends Model
 
     public function getCreatedAtHumanAttribute(): string
     {
-        return $this->created_at->diffForHumans();
-    }
+        if ($this->created_at instanceof \Carbon\Carbon) {
+            return $this->created_at->diffForHumans();
+        }
+        
+        return 'منذ وقت غير محدد';        }
 
-    public function getLevelNameAttribute(): string
-    {
-        return match($this->assigned_level) {
-            3       => 'Employee',
-            2       => 'Department Manager',
-            1       => 'Head of Organization',
-            default => 'Unknown',
-        };
-    }
+        public function getLevelNameAttribute(): string
+        {
+            return match((int)$this->assigned_level) {
+                3       => 'Employee',
+                2       => 'Department Manager',
+                1       => 'Head of Organization',
+                default => 'Pending Assignment', 
+            };
+        }
 
     protected static function booted(): void
     {

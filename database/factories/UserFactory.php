@@ -23,17 +23,21 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $email = fake()->unique()->safeEmail();
         return [
             'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
+            'email' => $email,
+            // توليد يوزر نيم تلقائي كما يفعل الكنترولر الخاص بكِ
+            'username' => explode('@', $email)[0] . '_' . rand(100, 999), 
             'phone' => fake()->unique()->numerify('05########'),
             'birthdate' => fake()->date(),
             'password' => static::$password ??= Hash::make('password'),
             'is_verified' => true,
+            'role_id' => 3, // القيمة الافتراضية للمواطن
+            'authority_id' => 1,
             'remember_token' => Str::random(10),
         ];
     }
-
     /**
      * Indicate that the model's email address should be unverified.
      */

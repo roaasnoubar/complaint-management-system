@@ -86,4 +86,8 @@ class DashboardController extends Controller
             'data' => $data
         ]);
     }
+    public function index()
+{
+    return response()->json(['message' => 'Welcome to Dashboard']);
+}
 }

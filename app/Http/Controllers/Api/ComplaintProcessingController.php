@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Mail\StatusChangedMail;
+use App\Http\Resources\Api\ComplainResource;
 use App\Models\Complain;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -15,73 +16,136 @@ class ComplaintProcessingController extends \App\Http\Controllers\Controller
      * تحديث حالة الشكوى (استلام، حل) مع تحديث نقاط المصداقية وتوقيت التعيين.
      */
     public function updateStatus(Request $request, $id): JsonResponse
-{
-    $user     = $request->user();
-    $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
-
-    // 1. التحقق من الصلاحيات
-    if (!$user->isEmployee() && !$user->isAdmin()) {
-        return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
-    }
-
-    // 2. الموظف يعالج فقط شكاوى قسمه وجهته
-    if ($user->isEmployee()) {
-        // نصيحة: استخدمي intval لضمان دقة المقارنة بين الأنواع
-        if (intval($complain->auth_id) !== intval($user->authority_id) || 
-            intval($complain->department_id) !== intval($user->department_id)) {
-            return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
+    {
+        $user     = $request->user();
+        $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
+    
+        // 1. التحقق من الصلاحيات
+        if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
         }
-    }
-
-    // 3. التحقق من الانتقال المسموح به للحالة
-    $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
-
-    if (!$allowedNextStatus) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Complaint is already resolved or in a final state.',
-        ], 422);
-    }
-
-    // تصحيح الثغرة: بما أن STATUS_TRANSITIONS مصفوفة، نأخذ العنصر الأول [0] 
-    // ليتخزن كنص (String) في الداتا بيز ولا يعطي خطأ SQL
-    $nextStatusValue = is_array($allowedNextStatus) ? $allowedNextStatus[0] : $allowedNextStatus;
-
-    $previousStatus   = $complain->status;
-    $complain->status = $nextStatusValue;
-
-    // --- معالجة الثغرات المنطقية (كما هي في كودك) ---
-    if ($nextStatusValue === Complain::STATUS_IN_PROGRESS) {
-        $complain->assigned_at = now(); // بدء عداد الـ 5 أيام
-    }
-
-    if ($nextStatusValue === Complain::STATUS_RESOLVED) {
-        $complain->resolved_at = now();
-        if ($complain->user) {
-            $complain->user->increment('score'); // زيادة المصداقية
+    
+        // 2. التحقق من التبعية (للموظف ومدير القسم)
+        if ($user->isEmployee() || $user->isDeptManager()) {
+            if (intval($complain->department_id) !== intval($user->department_id)) {
+                return response()->json(['success' => false, 'message' => 'هذه الشكوى لا تتبع لقسمك.'], 403);
+            }
         }
-    }
-
-    $complain->save();
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Status updated successfully.',
-        'data' => $complain]);
-        // إرسال الإشعار
-        $this->sendStatusEmail($complain, $allowedNextStatus);
-
+    
+        // 3. التحقق من إمكانية تغيير الحالة
+        $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
+    
+        if (!$allowedNextStatus) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complaint is already resolved or in a final state.',
+            ], 422);
+        }
+    
+        $nextStatusValue = is_array($allowedNextStatus) ? $allowedNextStatus[0] : $allowedNextStatus;
+        $previousStatus   = $complain->status;
+    
+        // --- التعديلات الجوهرية هنا ---
+        
+        $complain->status = $nextStatusValue;
+        
+        // توثيق رتبة المعالج الحالي (إذا دخلتِ بتوكين مدير القسم سيصبح هنا 2)
+        $complain->assigned_level = $user->role->level; 
+    
+        if ($nextStatusValue === Complain::STATUS_IN_PROGRESS) {
+            $complain->assigned_at = now(); 
+        }
+    
+        if ($nextStatusValue === Complain::STATUS_RESOLVED) {
+            $complain->resolved_at = now();
+            if ($complain->user) {
+                $complain->user->increment('score'); 
+            }
+        }
+    
+        // حفظ كل التغييرات في قاعدة البيانات
+        $complain->save();
+    
+        // إرسال الإشعار (نمرر القيمة النصية وليس المصفوفة)
+        $this->sendStatusEmail($complain, $nextStatusValue);
+    
+        // الرد النهائي الموحد (تم حذف الـ return الزائد الذي كان قبله)
         return response()->json([
             'success' => true,
-            'message' => "Status updated from {$previousStatus} to {$allowedNextStatus}",
+            'message' => "Status updated from {$previousStatus} to {$nextStatusValue}",
             'data'    => [
-                'id'              => $complain->id,
-                'current_status'  => $complain->status,
-                'user_new_score'  => $complain->user ? $complain->user->score : null,
+                'id'             => $complain->id,
+                'current_status' => $complain->status,
+                'assigned_level' => $complain->assigned_level, 
+                'level_name'     => $complain->level_name,     
+                'user_new_score' => $complain->user ? $complain->user->score : null,
             ],
         ], 200);
     }
-
+    public function reject(Request $request, $id): JsonResponse
+    {
+        $user = $request->user(); // جلب بيانات المستخدم من التوكين الحالي
+        $complain = Complain::with('user')->findOrFail($id);
+    
+        // 1. تحديد مستوى الرفض والاسم بناءً على دور المستخدم (Role) من التوكين
+        // نفترض أن الأدوار هي: employee, dept_manager, auth_manager
+        $rejectionLevel = match(true) {
+            $user->isEmployee() => 3,         // موظف
+            $user->isDeptManager() => 2,      // مدير قسم
+            $user->isAuthorityManager() => 1, // مدير جهة
+            $user->isAdmin() => 1,            // الأدمن يعامل كأعلى مستوى
+            default => null
+        };
+    
+        if ($rejectionLevel === null) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized role.'], 403);
+        }
+    
+        // 2. التحقق من التبعية (القسم أو الجهة) لضمان عدم رفض شكوى غريبة
+        if (!$user->isAdmin()) {
+            if ($rejectionLevel >= 2) { // موظف أو مدير قسم
+                if (intval($complain->department_id) !== intval($user->department_id)) {
+                    return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
+                }
+            } else { // مدير جهة
+                if (intval($complain->authority_id) !== intval($user->authority_id)) {
+                    return response()->json(['success' => false, 'message' => 'Not authorized for this authority.'], 403);
+                }
+            }
+        }
+    
+        // 3. التحقق من إدخال السبب
+        $request->validate([
+            'rejection_reason' => 'required|string|min:5',
+        ]);
+    
+        // 4. تنفيذ الرفض وخصم النقاط
+        // خصم نقطة واحدة من سكور اليوزر (أو القيمة التي تفضلينها)
+        if ($complain->user) {
+            $complain->user->decrement('score', 1); 
+        }
+    
+        $complain->update([
+            'status' => 'Rejected',
+            'notes' => $request->rejection_reason,
+            'assigned_level' => $rejectionLevel, // تخزين المستوى الذي قام بالرفض بناءً على التوكين
+        ]);
+    
+        // 5. إرسال إشعار
+        $this->sendStatusEmail($complain, 'Rejected');
+    
+        return response()->json([
+            'success' => true,
+            'message' => "تم رفض الشكوى بنجاح من قبل " . $user->name,
+            'data' => [
+                'id' => $complain->id,
+                'status' => $complain->status,
+                'assigned_level' => $complain->assigned_level,
+                'level_name' => $complain->level_name, // سيعطي الاسم بناءً على الـ assigned_level الجديد
+                'user_new_score' => $complain->user ? $complain->user->score : null
+            ]
+        ], 200);
+    }
     /**
      * دالة التصعيد اليدوي: تنقل الشكوى للمستوى الإداري الأعلى بعد مرور المدة المحددة.
      */

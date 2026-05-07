@@ -20,5 +20,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })
-    // تأكدي أن السهم -> موجود قبل كلمة withCommands
+    // أضيفي هذا القسم هنا لتسجيل أمر التصعيد يدوياً
+    ->withCommands([
+        \App\Console\Commands\EscalateComplaints::class,
+    ])
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->append(\App\Http\Middleware\CheckEscalation::class);
+    })
     ->create();

@@ -39,7 +39,7 @@ class AuthController extends Controller
             'verification_expires_at' => now()->addMinutes(10),
             'is_verified'             => false,
             'role_id'                 => 3, 
-            'authority_id'            => 1, 
+            'authority_id'            => null, 
             'score'                   => 0,
             'is_active'               => true,
             'is_banned'               => false,
@@ -70,10 +70,10 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('email', $request->email)
-                    ->where('verification_code', $request->code)
-                    ->where('verification_expires_at', '>=', now())
-                    ->first();
-
+            ->where('verification_code', trim($request->code)) 
+            ->where('verification_expires_at', '>=', now()->subMinutes(2)) // أضفنا دقيقتين سماح
+            ->first();
+            
         if (!$user) {
             return response()->json([
                 'success' => false,
