@@ -161,6 +161,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/departments', [DepartmentController::class, 'index']); 
     Route::post('/complaints', [ComplaintController::class, 'store']); 
     Route::get('/my-complaints', [ComplaintController::class, 'userComplaints']);
+    Route::get('/authorities', [AuthorityController::class, 'index']);
     Route::get('/complaints/{id}', [ComplaintController::class, 'show']); 
     // --- 5. نظام المحادثة (Chat API) ---
     Route::prefix('chat')->group(function () {
