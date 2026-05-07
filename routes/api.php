@@ -139,13 +139,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/users', [UserManagementController::class, 'index']);
     });
   
+
     Route::prefix('manager')->middleware(['auth:sanctum', 'role:manager,dept_manager'])->group(function () {
         Route::get('/my-departments', [DepartmentController::class, 'index']); 
         Route::post('/create-employee', [UserManagementController::class, 'store']);
         Route::get('/statistics', [DashboardController::class, 'getAuthorityStats']);
-    
-        // أبقينا فقط مسارات العرض
-        Route::get('/complaints', [ComplaintController::class, 'index']); 
+            Route::get('/complaints', [ComplaintController::class, 'index']); 
         Route::get('/complaints/{id}', [ComplaintController::class, 'show']);
     });
     // --- 3. نظام الشكاوى (الموظف) ---
@@ -160,7 +159,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- 4. نظام الشكاوى (المستخدم العادي) ---
     Route::post('/complaints', [ComplaintController::class, 'store']); 
     Route::get('/my-complaints', [ComplaintController::class, 'userComplaints']);
-
+    Route::get('/complaints/{id}', [ComplaintController::class, 'show']); 
     // --- 5. نظام المحادثة (Chat API) ---
     Route::prefix('chat')->group(function () {
         Route::get('/complaints/{complainId}', [ChatController::class, 'getChat']); 

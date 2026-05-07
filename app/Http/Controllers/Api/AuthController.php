@@ -70,10 +70,10 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('email', $request->email)
-                    ->where('verification_code', $request->code)
-                    ->where('verification_expires_at', '>=', now())
-                    ->first();
-
+            ->where('verification_code', trim($request->code)) 
+            ->where('verification_expires_at', '>=', now()->subMinutes(2)) // أضفنا دقيقتين سماح
+            ->first();
+            
         if (!$user) {
             return response()->json([
                 'success' => false,
