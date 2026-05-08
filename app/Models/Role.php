@@ -5,10 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Role extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
+        'type',  
         'name',
         'level',
     ];
@@ -19,7 +22,7 @@ class Role extends Model
 
     const ADMIN    = 'admin';
     const EMPLOYEE = 'employee';
-    const USER     = 'user';
+    const USER     = 'citizen';
 
     public function permissions(): BelongsToMany
     {

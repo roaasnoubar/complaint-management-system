@@ -16,7 +16,12 @@ class ComplaintController extends Controller
      */
     public function store(Request $request)
     {
-        // 1. التحقق من البيانات
+        if (!auth()->user()->is_verified) {
+            return response()->json([
+                'success' => false,
+                'message' => 'يجب تفعيل حسابك أولاً لتتمكن من تقديم شكوى.'
+            ], 403);
+        }
         $request->validate([
             'title'         => 'required|string',
             'description'   => 'required|string',
@@ -173,6 +178,25 @@ class ComplaintController extends Controller
             'success' => false,
             'message' => 'غير مصرح لك بمشاهدة هذه الشكوى'
         ], 403);
+    }
+    else if (in_array($user->role?->level, [1, 2, 3])) {
+        
+        // أ. منع موظف من رؤية شكوى تابعة لوزارة (Authority) أخرى
+        if ($complain->authority_id !== $user->authority_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'هذه الشكوى تابعة لجهة حكومية أخرى'
+            ], 403);
+        }
+
+        // ب. منع الموظف من رؤية شكوى مصعدة لمستوى أعلى منه
+        // ملاحظة: إذا كان level 1 هو الأقل و 3 هو المدير
+        if ($complain->assigned_level > $user->role->level) {
+            return response()->json([
+                'success' => false,
+                'message' => 'هذه الشكوى مصعدة لمستوى إداري أعلى'
+            ], 403);
+        }
     }
 
     // 1. تحميل العلاقات أولاً على الكائن الحالي

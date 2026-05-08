@@ -2,26 +2,19 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase; // تأكدي من استخدام TestCase الخاص بـ Laravel
+use PHPUnit\Framework\TestCase; // لاحظي استخدام TestCase الأساسي ليكون اختبار وحدة حقيقي
 use App\Models\ChatMessage;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class ChatMessageTest extends TestCase
 {
-    use RefreshDatabase; // لتنظيف قاعدة بيانات الاختبار بعد كل تجربة
-
-    /** @test */
-    public function a_message_has_is_read_default_to_false()
+    public function test_a_message_has_is_read_default_to_false()
     {
-        // 1. تجهيز البيانات (مثال لرسالة جديدة)
+        // ننشئ كائن بدون حفظه في قاعدة البيانات
         $message = new ChatMessage([
-            'message' => 'اختبار وحدة برمجي',
-            'sender_id' => 1,
-            'chat_id' => 1,
+            'message' => 'اختبار بدون قاعدة بيانات',
         ]);
 
-        // 2. التحقق من القيمة الافتراضية لحقل is_read
-        // نتوقع أن تكون القيمة false (0)
+        // نتحقق من القيمة الافتراضية
         $this->assertEquals(0, $message->is_read);
     }
 }

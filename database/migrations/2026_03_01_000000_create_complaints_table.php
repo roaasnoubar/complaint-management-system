@@ -32,6 +32,7 @@ return new class extends Migration
             // التأكد من تطابق الحالات مع الموديل
             $table->enum('status', ['Pending', 'In Progress', 'Resolved', 'Rejected'])->default('Pending');
             $table->boolean('is_valid')->default(true);
+            $table->integer('level')->default(1);
             $table->integer('assigned_level')->default(3); 
             
             $table->timestamp('assigned_at')->nullable();

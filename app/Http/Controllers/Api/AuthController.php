@@ -10,12 +10,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
-use App\Mail\OtpMail;               // هاد السطر اللي ناقصك (قالب الرسالة)
+use App\Mail\OtpMail;               
 class AuthController extends Controller
 {
-    /**
-     * تسجيل مستخدم جديد (مواطن) مع كود OTP
-     */
+    
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -38,7 +36,7 @@ class AuthController extends Controller
             'verification_code'       => $verificationCode,
             'verification_expires_at' => now()->addMinutes(10),
             'is_verified'             => false,
-            'role_id'                 => 3, 
+            'role_id' => \App\Models\Role::where('name', \App\Models\Role::USER)->first()?->id ?? 5,
             'authority_id'            => null, 
             'score'                   => 0,
             'is_active'               => true,
@@ -59,9 +57,7 @@ class AuthController extends Controller
         ], 201);
     }
 
-    /**
-     * تفعيل الإيميل والحصول على التوكن
-     */
+    
     public function verifyEmail(Request $request): JsonResponse
     {
         $request->validate([
@@ -100,30 +96,40 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * تسجيل الدخول (للمواطن والموظف)
-     */
+    
     public function login(Request $request): JsonResponse
 {
-    // 1. التحقق من البيانات (جعلنا الحقل يقبل أي نص سواء إيميل أو يوزرنيم)
+    // 1. التحقق من البيانات
     $credentials = $request->validate([
-        'username' => 'required|string', // سنبقي الاسم 'username' في Postman لتجنب تغيير التيست، لكنه سيقبل إيميل أيضاً
+        'username' => 'required|string',
         'password' => 'required|string',
     ]);
 
-    // 2. تحديد نوع الحقل (هل المدخل إيميل أم يوزرنيم؟)
+    // 2. تحديد نوع الحقل
     $loginField = filter_var($request->username, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
-    // 3. محاولة تسجيل الدخول بناءً على النوع المحدد
+    // 3. محاولة تسجيل الدخول
     if (!Auth::attempt([$loginField => $request->username, 'password' => $request->password])) {
         return response()->json([
             'success' => false,
-            'message' => 'بيانات الدخول غير صحيحة (الإيميل/اسم المستخدم أو كلمة المرور).'
+            'message' => 'بيانات الدخول غير صحيحة.'
         ], 401);
     }
 
-    // 4. جلب المستخدم الحالي وإنشاء التوكن
+    // 4. جلب المستخدم والتحقق من التفعيل (الإضافة هنا)
     $user = Auth::user();
+
+    if (!$user->is_verified) {
+        // تسجيل خروج المستخدم فوراً لأنه نجح في Attempt لكن حسابه غير مفعل
+        Auth::logout(); 
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'يرجى تفعيل الحساب أولاً عبر الكود المرسل لإيميلك.'
+        ], 403); // هذا هو الكود الذي ينتظره التيست (403)
+    }
+
+    // 5. إنشاء التوكن في حال كان الحساب مفعلاً
     $token = $user->createToken('auth_token')->plainTextToken;
 
     return response()->json([
@@ -132,7 +138,7 @@ class AuthController extends Controller
         'data'    => [
             'token'      => $token,
             'token_type' => 'Bearer',
-            'user'       => $user->load(['role', 'authority', 'department']), // تحميل العلاقات لضمان ظهور IDs الأقسام والجهات
+            'user'       => $user->load(['role', 'authority', 'department']),
         ],
     ], 200);
 }
@@ -146,7 +152,7 @@ class AuthController extends Controller
             'username'     => 'required|string|unique:users,username',
             'email'        => 'required|email|unique:users,email',
             'password'     => 'required|string|min:6',
-            'phone'        => 'required|string|unique:users,phone', // أضيفي هذا السطر
+            'phone'        => 'required|string|unique:users,phone', 
             'authority_id' => 'required|exists:authorities,id',
         ]);
 
@@ -156,7 +162,7 @@ class AuthController extends Controller
             'email'        => $validated['email'],
             'password'     => \Illuminate\Support\Facades\Hash::make($validated['password']),
             'phone'        => $request->phone ?? ('09' . rand(10000000, 99999999)),
-            'role_id'      => 2, 
+            'role_id' => \App\Models\Role::where('name', 'employee')->first()?->id ?? 2,
             'authority_id' => $validated['authority_id'],
             'is_verified'  => true, 
             'is_active'    => true,
@@ -170,9 +176,7 @@ class AuthController extends Controller
         ], 201);
     }
 
-    /**
-     * جلب بيانات المستخدم الحالي
-     */
+    
     public function me(Request $request)
     {
         $user = $request->user()->load(['role','authority', 'department']);
@@ -183,9 +187,7 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * تسجيل الخروج
-     */
+    
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
