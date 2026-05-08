@@ -77,19 +77,26 @@ class ComplaintController extends Controller
     $now = \Carbon\Carbon::now();
 
     // 1. تحديث شامل لقاعدة البيانات (التصعيد التلقائي) قبل جلب البيانات
-    // تصعيد لمدير الجهة (1) إذا مر أكثر من دقيقتين
-    \DB::table('complains')
-        ->where('created_at', '<=', $now->copy()->subMinutes(2))
-        ->where('assigned_level', '>', 1)
-        ->update(['assigned_level' => 1, 'updated_at' => $now]);
+\DB::table('complains')
+    ->where('assigned_level', 2) 
+    ->where('assigned_at', '<=', $now->copy()->subMinutes(2))
+    ->where('status', '!=', 'Resolved')
+    ->update([
+        'assigned_level' => 1,
+        'assigned_at'    => $now, 
+        'updated_at'     => $now
+    ]);
 
-    // تصعيد لمدير القسم (2) إذا مر أكثر من دقيقة (وأقل من دقيقتين)
-    \DB::table('complains')
-        ->where('created_at', '<=', $now->copy()->subMinutes(1))
-        ->where('created_at', '>', $now->copy()->subMinutes(2))
-        ->where('assigned_level', '>', 2)
-        ->update(['assigned_level' => 2, 'updated_at' => $now]);
-
+// أي شكوى عند الموظف (Level 3) ومر عليها دقيقة واحدة ولم تُحل
+\DB::table('complains')
+    ->where('assigned_level', 3)
+    ->where('assigned_at', '<=', $now->copy()->subMinutes(1))
+    ->where('status', '!=', 'Resolved')
+    ->update([
+        'assigned_level' => 2,
+        'assigned_at'    => $now, // إعادة تصفير العداد للمستوى الجديد
+        'updated_at'     => $now
+    ]);
     // 2. بناء الاستعلام بناءً على الصلاحيات
     $query = Complain::with(['authority:id,name', 'department:id,name', 'attachments', 'user:id,name']);
 
@@ -184,7 +191,6 @@ class ComplaintController extends Controller
 
     // 4. التحقق من صلاحيات الموظفين (الوزارة والمستوى الإداري)
     if (in_array($user->role?->level, [1, 2, 3])) {
-        // أ. منع موظف من رؤية شكوى تابعة لوزارة أخرى
         if ($complain->authority_id !== $user->authority_id) {
             return response()->json([
                 'success' => false,
@@ -209,7 +215,20 @@ class ComplaintController extends Controller
         'Pending'     => 'تم استلام شكواك وهي بانتظار المراجعة من قبل القسم المختص.',
         default       => 'الشكوى تحت المراجعة.'
     };
-
+    if ($isStaff && $complain->status === 'Pending') {
+        $complain->update([
+            'status' => 'In Progress',
+            'updated_at' => now() 
+        ]);
+        $complain->status = 'In Progress';
+    }
+    $statusMessage = match($complain->status) {
+        'Resolved'    => 'شكراً لثقتك في تطبيقنا، تمت معالجة الشكوى بنجاح.',
+        'Rejected'    => 'تم الاعتذار عن معالجة الشكوى. السبب: ' . ($complain->admin_reply ?? 'لم يتم ذكر سبب'),
+        'In Progress' => 'شكواك قيد المعالجة الآن، نحن نعمل على حلها.',
+        'Pending'     => 'تم استلام شكواك وهي بانتظار المراجعة من قبل القسم المختص.',
+        default       => 'الشكوى تحت المراجعة.'
+    };
     // 6. تحميل العلاقات
     $complain->load([
         'user:id,name', 

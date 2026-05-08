@@ -13,16 +13,28 @@ class EmployeeComplaintController extends Controller
      * 1. عرض قائمة الشكاوى (Index)
      */
     public function getComplaints(Request $request): JsonResponse
-    {
-         // 1. منطق التصعيد (بدلاً من استدعاء الكوماند المفقود)
-           $delay = \Carbon\Carbon::now('UTC')->subMinute(); 
+{
+    $now = now();
 
-           \App\Models\Complain::where('assigned_level', 3)
-            ->where('created_at', '<=', $delay)
-            ->update([
-               'assigned_level' => 2, 
-               'updated_at' => now()
-    ]);
+    // 1. تصعيد لمدير الجهة (Level 1)
+    // الشرط: عند مدير القسم (2) + مر عليها دقيقة + لم تُفتح (أو لم تُحل)
+    \App\Models\Complain::where('assigned_level', 2)
+        ->where('updated_at', '<=', $now->copy()->subMinute()) // مر دقيقة على وصولها للمدير
+        ->where('status', '=', 'Pending') // نفترض أن Pending تعني لم تفتح/تبدأ المعالجة
+        ->update([
+            'assigned_level' => 1,
+            'updated_at' => $now
+        ]);
+
+    // 2. تصعيد لمدير القسم (Level 2)
+    // الشرط: عند الموظف (3) + مر عليها دقيقة + لم تُفتح
+    \App\Models\Complain::where('assigned_level', 3)
+        ->where('created_at', '<=', $now->copy()->subMinute())
+        ->where('status', '=', 'Pending')
+        ->update([
+            'assigned_level' => 2,
+            'updated_at' => $now
+        ]);
 
 // 2. تكملة الكود الخاص بكِ
 $employee = $request->user();
