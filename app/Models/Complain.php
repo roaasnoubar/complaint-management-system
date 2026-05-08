@@ -33,13 +33,13 @@ class Complain extends Model
     ];
 
     // إضافة الحقول الوهمية للـ JSON لسهولة التعامل مع الأندرويد
-    protected $appends = ['created_at_human', 'level_name', 'can_chat'];
+    protected $appends = ['created_at_human', 'level_name', 'can_chat' , 'status_color'];
 
     protected $casts = [
-        'created_at'  => 'datetime',
-        'updated_at'  => 'datetime',
-        'resolved_at' => 'datetime',
-        'assigned_at' => 'datetime',
+        'created_at'  => 'datetime:Y-m-d H:i:s',
+        'updated_at'  => 'datetime:Y-m-d H:i:s',
+        'resolved_at' => 'datetime:Y-m-d H:i:s',
+        'assigned_at' => 'datetime:Y-m-d H:i:s',
         'is_valid'    => 'boolean',
     ];
     protected $with = ['user', 'authority', 'department'];
@@ -167,4 +167,18 @@ class Complain extends Model
     public function department(): BelongsTo { return $this->belongsTo(Department::class); }
     public function attachments(): HasMany { return $this->hasMany(Attachment::class, 'complain_id'); }
     public function chat(): HasOne { return $this->hasOne(ComplainChat::class, 'complain_id'); }
+    public function getStatusColorAttribute(): string
+    {
+        return match($this->status) {
+            self::STATUS_PENDING     => '#FFA500', // برتقالي
+            self::STATUS_IN_PROGRESS => '#0000FF', // أزرق
+            self::STATUS_RESOLVED    => '#008000', // أخضر
+            self::STATUS_REJECTED    => '#FF0000', // أحمر
+            default => '#808080',
+        };
+    }
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
 }
