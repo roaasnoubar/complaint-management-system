@@ -183,6 +183,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/clear-all', [NotificationController::class, 'deleteAll']);
         Route::delete('/{id}',      [NotificationController::class, 'destroy']);
     });
+    Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
+
     Route::middleware('auth:sanctum')->group(function () {
 
         Route::post('/complaints/{id}/escalate', [ComplaintController::class, 'escalateToManager']);

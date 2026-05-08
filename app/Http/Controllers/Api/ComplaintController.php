@@ -31,9 +31,11 @@ class ComplaintController extends Controller
             'attachments'   => 'nullable|array',
             'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
+        $complaintNumber = now()->format('Ymd') . '-' . rand(1000, 9999);
     
         // 2. إنشاء الشكوى (بدون أي إنشاء للمحادثة)
         $complain = Complain::create([
+            'complain_number' => $complaintNumber,
             'user_id'       => auth()->id(),
             'full_name'     => $request->full_name,
             'authority_id'  => $request->authority_id,
@@ -155,13 +157,13 @@ class ComplaintController extends Controller
 {
     $user = auth()->user();
 
-    // 1. جلب الشكوى يدوياً مع تحميل كافة العلاقات والبيانات المرتبطة
-    // استخدمنا find() لضمان جلب السجل المطلوب بدقة من قاعدة البيانات
+    // 1. جلب الشكوى (بالآيدي أو بالرقم)
     $complain = \App\Models\Complain::with(['user', 'authority', 'department', 'attachments', 'chat.messages.sender'])
-    ->where('id', $id)
-    ->orWhere('complain_number', $id) 
-    ->first();
-    // 2. التحقق من وجود الشكوى في قاعدة البيانات
+        ->where('id', $id)
+        ->orWhere('complain_number', $id) 
+        ->first();
+
+    // 2. التحقق من وجود الشكوى
     if (!$complain) {
         return response()->json([
             'success' => false,
@@ -169,9 +171,9 @@ class ComplaintController extends Controller
         ], 404);
     }
 
-    // 3. التحقق من الصلاحيات
+    // 3. التحقق من الصلاحيات العامة
     $isOwner = $complain->user_id == $user->id;
-    $isStaff = in_array($user->role?->level, [0, 1, 2, 3]); // أضفت المستوى 0 للأدمن احتياطاً
+    $isStaff = in_array($user->role?->level, [0, 1, 2, 3]);
 
     if (!$isOwner && !$isStaff) {
         return response()->json([
@@ -179,9 +181,10 @@ class ComplaintController extends Controller
             'message' => 'غير مصرح لك بمشاهدة هذه الشكوى'
         ], 403);
     }
-    else if (in_array($user->role?->level, [1, 2, 3])) {
-        
-        // أ. منع موظف من رؤية شكوى تابعة لوزارة (Authority) أخرى
+
+    // 4. التحقق من صلاحيات الموظفين (الوزارة والمستوى الإداري)
+    if (in_array($user->role?->level, [1, 2, 3])) {
+        // أ. منع موظف من رؤية شكوى تابعة لوزارة أخرى
         if ($complain->authority_id !== $user->authority_id) {
             return response()->json([
                 'success' => false,
@@ -190,7 +193,6 @@ class ComplaintController extends Controller
         }
 
         // ب. منع الموظف من رؤية شكوى مصعدة لمستوى أعلى منه
-        // ملاحظة: إذا كان level 1 هو الأقل و 3 هو المدير
         if ($complain->assigned_level > $user->role->level) {
             return response()->json([
                 'success' => false,
@@ -199,7 +201,16 @@ class ComplaintController extends Controller
         }
     }
 
-    // 1. تحميل العلاقات أولاً على الكائن الحالي
+    // 5. إنشاء رسالة الحالة المخصصة (وضعناها هنا لتكون جاهزة للرد)
+    $statusMessage = match($complain->status) {
+        'Resolved'    => 'شكراً لثقتك في تطبيقنا، تمت معالجة الشكوى بنجاح.',
+        'Rejected'    => 'تم الاعتذار عن معالجة الشكوى. السبب: ' . ($complain->admin_reply ?? 'لم يتم ذكر سبب'),
+        'In Progress' => 'شكواك قيد المعالجة الآن، نحن نعمل على حلها.',
+        'Pending'     => 'تم استلام شكواك وهي بانتظار المراجعة من قبل القسم المختص.',
+        default       => 'الشكوى تحت المراجعة.'
+    };
+
+    // 6. تحميل العلاقات
     $complain->load([
         'user:id,name', 
         'authority', 
@@ -208,9 +219,10 @@ class ComplaintController extends Controller
         'chat.messages.sender'
     ]);
 
-    // 2. الآن نعيد الاستجابة، ستكون العلاقات موجودة والـ Appends (مثل level_name) ستجد البيانات لتعمل
+    // 7. الرد النهائي مع الرسالة
     return response()->json([
         'success' => true,
+        'status_message' => $statusMessage, // هذه هي الرسالة التي طلبتِها
         'data'    => $complain
     ]);
 }
@@ -451,5 +463,47 @@ public function getComplaintsByStatus(Request $request, $status): JsonResponse
         'count' => $complaints->count(),
         'data' => $complaints
     ], 200);
+}
+/**
+ * دالة الرد على الشكوى وتحديث النقاط وإرسال إشعار لحظي
+ */
+public function respond(Request $request, $id) 
+{
+    // 1. التحقق من المدخلات (النص، وحالة الشكوى، وصحة الشكوى للنقاط)
+    $request->validate([
+        'reply' => 'required|string|min:5',
+        'status' => 'required|in:Resolved,Rejected',
+        'is_valid' => 'required|boolean' // الموظف يحدد إذا كانت الشكوى صادقة أم كاذبة
+    ]);
+
+    // 2. جلب الشكوى مع المستخدم صاحب الشكوى
+    $complaint = \App\Models\Complain::findOrFail($id);
+    $citizen = $complaint->user;
+
+    // 3. تحديث بيانات الشكوى بحقل الرد الجديد
+    $complaint->update([
+        'status' => $request->status,
+        'admin_reply' => $request->reply, 
+        'resolved_at' => now()
+    ]);
+
+    // 4. تحديث نقاط المواطن (باستخدام الدالة الموجودة في موديل User عندك)
+    // تذكري: إذا كانت صادقة تزيد 10 نقاط، وإذا كاذبة تنقص 20
+    $citizen->adjustScoreByValidity($request->is_valid);
+
+    // 5. إرسال الإشعار وبثه لحظياً (Event Broadcasting)
+    // هذه الدالة ستستدعي Event NotificationSent الذي أرسلتِ كوده
+    $title = ($request->status == 'Resolved') ? 'تمت معالجة شكواك' : 'تحديث بشأن شكواك';
+    $citizen->sendNotification(
+        $title,
+        $request->reply,
+        'COMPLAINT_ACTION',
+        ['complaint_id' => $complaint->id]
+    );
+
+    return response()->json([
+        'success' => true,
+        'message' => 'تم حفظ الرد، تحديث النقاط، وإرسال الإشعار بنجاح'
+    ]);
 }
 }

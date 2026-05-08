@@ -142,4 +142,16 @@ class NotificationController extends Controller
             'message' => 'Notification deleted successfully.',
         ]);
     }
+    public function latest(): JsonResponse
+{
+    $notifications = Notification::where('user_id', auth()->id())
+        ->latest()
+        ->take(5) // جلب آخر 5 إشعارات فقط
+        ->get();
+
+    return response()->json([
+        'success' => true,
+        'data'    => $notifications,
+    ]);
+}
 }

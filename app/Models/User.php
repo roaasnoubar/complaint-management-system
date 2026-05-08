@@ -162,4 +162,25 @@ class User extends Authenticatable
     {
         return $this->hasMany(Rating::class);
     }
+    public function sendNotification(string $title, string $message, string $type, array $data = [])
+{
+    $notification = $this->notifications()->create([
+        'title'   => $title,
+        'message' => $message,
+        'type'    => $type,
+        'data'    => $data,
+        'is_read' => false,
+    ]);
+
+    // إطلاق البث المباشر فوراً للمواطن
+    event(new \App\Events\NotificationSent($notification));
+
+    return $notification;
+}
+
+// ولا تنسي إضافة العلاقة التي تسمح بتخزين الإشعارات
+public function notifications(): HasMany
+{
+    return $this->hasMany(Notification::class);
+}
 }
