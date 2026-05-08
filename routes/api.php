@@ -38,35 +38,35 @@ Route::prefix('auth')->group(function () {
 
 // انقليه إلى هنا (خارج الـ middleware) ليعمل في البوست مان بدون Token
 Route::get('/escalate-complaints', function () {
-    $delay = \Carbon\Carbon::now('UTC')->subMinute();
+    // 1. استخدام الوقت المحلي (دمشق) بشكل صريح وموحد لكل العملية
+    $now = \Carbon\Carbon::now(); 
+    $delay = (clone $now)->subMinute(); // الشكاوى التي مر عليها دقيقة أو أكثر
 
-    // 1. تصعيد إلى مدير الجهة (Level 1)
+    // 2. تصعيد إلى مدير الجهة (Level 1)
+    // نبدأ بالفلتر الأعلى (Level 2 -> 1) لضمان عدم تصعيد الشكوى مرتين في نفس الطلب
     $toAuthority = \App\Models\Complain::where('assigned_level', 2)
-    ->where('assigned_at', '<=', $delay)
+        ->where('assigned_at', '<=', $delay)
         ->with('department')
         ->get();
 
     foreach ($toAuthority as $complaint) {
         $complaint->update([
             'assigned_level' => 1,
-            'assigned_at' => now(),
-            'updated_at' => now()
+            'assigned_at' => $now, // تحديث وقت التكليف الجديد بتوقيت دمشق
         ]);
     }
 
-    // 2. تصعيد إلى مدير القسم (Level 2)
+    // 3. تصعيد إلى مدير القسم (Level 2)
     $toManager = \App\Models\Complain::where('assigned_level', 3)
-    ->where('assigned_at', '<=', $delay)
+        ->where('assigned_at', '<=', $delay)
         ->with('department')
         ->get();
 
     foreach ($toManager as $complaint) {
         $complaint->update([
             'assigned_level' => 2,
-            'assigned_at' => now(),
-            'updated_at' => now()
+            'assigned_at' => $now, // تحديث وقت التكليف الجديد بتوقيت دمشق
         ]);
-
     }
 
     $totalCount = $toAuthority->count() + $toManager->count();
@@ -74,43 +74,35 @@ Route::get('/escalate-complaints', function () {
     if ($totalCount > 0) {
         return response()->json([
             'status' => 'success',
-            'message' => 'تمت عملية التصعيد الهرمي بنجاح',
+            'message' => 'تمت عملية التصعيد الهرمي بتوقيت دمشق بنجاح',
             'summary' => [
                 'total_escalated' => $totalCount,
-                'sent_to_authority_L1' => $toAuthority->count(), // توضيح صريح للمستوى 1
-                'sent_to_manager_L2' => $toManager->count(),    // توضيح صريح للمستوى 2
+                'sent_to_authority_L1' => $toAuthority->count(),
+                'sent_to_manager_L2' => $toManager->count(),
             ],
-            'breakdown_by_department' => [
-                'authority_level' => $toAuthority->groupBy('department.name')->map->count(),
-                'manager_level' => $toManager->groupBy('department.name')->map->count(),
-            ],
-            // هنا نعيد البيانات لنرى التغيير بعيننا
             'data' => [
-                'authority_escalations' => $toAuthority->map(function($item) {
-                    return [
-                        'id' => $item->id,
-                        'title' => $item->title,
-                        'new_level' => 1, // تأكيد القيمة الجديدة
-                        'level_name' => 'Authority Manager',
-                        'department' => $item->department->name ?? 'N/A'
-                    ];
-                }),
-                'manager_escalations' => $toManager->map(function($item) {
-                    return [
-                        'id' => $item->id,
-                        'title' => $item->title,
-                        'new_level' => 2,
-                        'level_name' => 'Department Manager',
-                        'department' => $item->department->name ?? 'N/A'
-                    ];
-                })
+                'authority_escalations' => $toAuthority->map(fn($item) => [
+                    'id' => $item->id,
+                    'title' => $item->title,
+                    'new_level' => 1,
+                    'level_name' => 'Authority Manager',
+                    'department' => $item->department->name ?? 'N/A'
+                ]),
+                'manager_escalations' => $toManager->map(fn($item) => [
+                    'id' => $item->id,
+                    'title' => $item->title,
+                    'new_level' => 2,
+                    'level_name' => 'Department Manager',
+                    'department' => $item->department->name ?? 'N/A'
+                ])
             ]
         ], 200);
     }
 
     return response()->json([
         'status' => 'idle',
-        'message' => 'النظام مستقر، لا توجد شكاوى تجاوزت المهلة الزمنية',
+        'message' => 'النظام مستقر، لا توجد شكاوى تجاوزت المهلة (1 دقيقة)',
+        'current_time' => $now->format('Y-m-d H:i:s'),
         'total_count' => 0
     ], 200);
 });

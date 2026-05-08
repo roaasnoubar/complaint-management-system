@@ -365,26 +365,62 @@ private function sendStatusNotification($complain, $nextStatus, $oldStatus, $not
             break;
     }
 }
-// داخل الملف تأكدي من وجود هذه الدالة:
-public function escalateToManager($id) 
+public function escalate(Request $request, $id) 
 {
-    // حذفنا حرف الـ t من نهاية الاسم ليتطابق مع ملفك Complain.php
     $complaint = \App\Models\Complain::find($id); 
 
     if (!$complaint) {
         return response()->json(['error' => 'الشكوى غير موجودة'], 404);
     }
 
-    $complaint->update(['assigned_level' => 2]);
+    $user = auth()->user();
+
+    // 1. التحقق من الصلاحية: (الموظف ليفل 1، أو مدير القسم ليفل 2، أو الأدمن ليفل 0)
+    if (!in_array($user->role?->level, [0, 1, 2])) {
+        return response()->json([
+            'success' => false,
+            'message' => 'عذراً، لا تملك صلاحية تصعيد الشكاوى.'
+        ], 403);
+    }
+
+    // 2. التحقق من البيانات المرسلة (نتوقع رقم المستوى المستهدف)
+    $request->validate([
+        'target_level' => 'required|in:1,2' // 1 لمدير الجهة، 2 لمدير القسم
+    ]);
+
+    $targetLevel = $request->target_level;
+
+    // 3. منطق التصعيد المنطقي:
+    // لا يمكن للموظف تصعيد شكوى لمستوى أقل من مستواها الحالي
+    if ($targetLevel >= $complaint->assigned_level && $user->role?->level != 0) {
+        return response()->json([
+            'success' => false,
+            'message' => 'لا يمكن تصعيد الشكوى لمستوى إداري أدنى أو مساوٍ للمستوى الحالي.'
+        ], 400);
+    }
+
+    // 4. تنفيذ التحديث
+    $complaint->update([
+        'assigned_level' => $targetLevel,
+        'assigned_at'    => now(),
+        'status'         => 'Escalated'
+    ]);
+
+    $levelName = ($targetLevel == 1) ? 'مدير الجهة' : 'مدير القسم';
 
     return response()->json([
-        'message' => 'تم التصعيد بنجاح',
-        'complaint_id' => $complaint->id
+        'success' => true,
+        'message' => "تم تصعيد الشكوى إلى ($levelName) بنجاح",
+        'data' => [
+            'complaint_id' => $complaint->id,
+            'new_level' => $targetLevel
+        ]
     ]);
 }
 public function getComplaintsByStatus(Request $request, $status): JsonResponse
 {
     $user = $request->user();
+
 
     // التأكد أن الحالة المرسلة صحيحة
     $validStatuses = ['Pending', 'In Progress', 'Resolved', 'Rejected'];
