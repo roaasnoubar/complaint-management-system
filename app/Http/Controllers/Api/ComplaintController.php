@@ -358,4 +358,38 @@ public function escalateToManager($id)
         'complaint_id' => $complaint->id
     ]);
 }
+public function getComplaintsByStatus(Request $request, $status): JsonResponse
+{
+    $user = $request->user();
+
+    // التأكد أن الحالة المرسلة صحيحة
+    $validStatuses = ['Pending', 'In Progress', 'Resolved', 'Rejected'];
+    if (!in_array($status, $validStatuses)) {
+        return response()->json(['success' => false, 'message' => 'حالة غير صالحة'], 400);
+    }
+
+    // بناء الاستعلام مع العلاقات الأساسية
+    $query = \App\Models\Complain::where('status', $status)
+                                 ->with(['user:id,name', 'department', 'authority']);
+
+    // نظام الحماية (Security Gate): كل شخص يرى فقط ما يخصه
+    if (!$user->isAdmin()) {
+        if ($user->hasRole('authority_manager')) {
+            // مدير الجهة يرى شكاوى جهته فقط
+            $query->where('authority_id', $user->authority_id);
+        } else {
+            // مدير القسم والموظف يريان شكاوى قسمهما فقط
+            $query->where('department_id', $user->department_id);
+        }
+    }
+
+    $complaints = $query->latest()->get();
+
+    return response()->json([
+        'success' => true,
+        'status_type' => $status,
+        'count' => $complaints->count(),
+        'data' => $complaints
+    ], 200);
+}
 }

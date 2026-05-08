@@ -193,8 +193,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::middleware('auth:sanctum')->group(function () {
 
-        // 1. رابط تصعيد الشكوى (من الموظف لمدير القسم)
-        // POST: /api/complaints/{id}/escalate
         Route::post('/complaints/{id}/escalate', [ComplaintController::class, 'escalateToManager']);
     
         // 2. رابط فتح محادثة (من مدير القسم مع مقدم الشكوى)
@@ -206,6 +204,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     
 Route::middleware(['auth:sanctum', 'role:admin,authority_manager,dept_manager,employee'])->group(function () {
+    Route::get('/complaints/filter/{status}', [ComplaintController::class, 'getComplaintsByStatus']);
     Route::post('/complaints/{id}/status', [ComplaintProcessingController::class, 'updateStatus']);
     Route::post('/complaints/{id}/reject', [ComplaintProcessingController::class, 'reject']);
 });

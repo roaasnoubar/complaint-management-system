@@ -16,55 +16,77 @@ class ComplaintProcessingController extends \App\Http\Controllers\Controller
      * تحديث حالة الشكوى (استلام، حل) مع تحديث نقاط المصداقية وتوقيت التعيين.
      */
     public function updateStatus(Request $request, $id): JsonResponse
-    {
-        $user     = $request->user();
-        $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
-    
-        // 1. التحقق من الصلاحيات
-        if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
+{
+    $user     = $request->user();
+    $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
+
+    // 1. التحقق من الصلاحيات العامة (هل هو موظف، مدير، أو أدمن؟)
+    if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
+        return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
+    }
+
+    // 2. التحقق من الهرمية (Hierarchy Check): 
+    // منع المستويات الأقل (رقمياً أكبر مثل الموظف 3) من تعديل مستويات أعلى (رقمياً أصغر مثل المدير 1)
+    if (!$user->isAdmin() && intval($complain->level) < intval($user->role->level)) {
+        return response()->json([
+            'success' => false, 
+            'message' => 'عذراً، هذه الشكوى في مستوى إداري أعلى من صلاحياتك ولا يمكنك معالجتها.'
+        ], 403);
+    }
+
+    // 3. التحقق من التبعية (للموظف ومدير القسم لضمان بقائهم ضمن قسمهم فقط)
+    if ($user->isEmployee() || $user->isDeptManager()) {
+        if (intval($complain->department_id) !== intval($user->department_id)) {
+            return response()->json(['success' => false, 'message' => 'هذه الشكوى لا تتبع لقسمك.'], 403);
         }
+    }
+
+    // 4. التحقق من إمكانية تغيير الحالة (Logic)
+    $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
+
+    if (!$allowedNextStatus) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Complaint is already resolved or in a final state.',
+        ], 422);
+    }
+
+    $nextStatusValue = is_array($allowedNextStatus) ? $allowedNextStatus[0] : $allowedNextStatus;
+    $previousStatus  = $complain->status;
+
+    // 5. تنفيذ التعديلات
+    $complain->status = $nextStatusValue;
     
-        // 2. التحقق من التبعية (للموظف ومدير القسم)
-        if ($user->isEmployee() || $user->isDeptManager()) {
-            if (intval($complain->department_id) !== intval($user->department_id)) {
-                return response()->json(['success' => false, 'message' => 'هذه الشكوى لا تتبع لقسمك.'], 403);
-            }
+    // توثيق رتبة المعالج الحالي (من التوكين)
+    $complain->assigned_level = $user->role->level; 
+
+    // إذا تحولت الحالة إلى "قيد المعالجة"
+    if ($nextStatusValue === Complain::STATUS_IN_PROGRESS) {
+        $complain->assigned_at = now(); 
+    }
+
+    // إذا تحولت الحالة إلى "تم الحل"
+    if ($nextStatusValue === Complain::STATUS_RESOLVED) {
+        $complain->resolved_at = now();
+        if ($complain->user) {
+            $complain->user->increment('score'); 
         }
-    
-        // 3. التحقق من إمكانية تغيير الحالة
-        $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
-    
-        if (!$allowedNextStatus) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Complaint is already resolved or in a final state.',
-            ], 422);
-        }
-    
-        $nextStatusValue = is_array($allowedNextStatus) ? $allowedNextStatus[0] : $allowedNextStatus;
-        $previousStatus   = $complain->status;
-    
-        // --- التعديلات الجوهرية هنا ---
-        
-        $complain->status = $nextStatusValue;
-        
-        // توثيق رتبة المعالج الحالي (إذا دخلتِ بتوكين مدير القسم سيصبح هنا 2)
-        $complain->assigned_level = $user->role->level; 
-    
-        if ($nextStatusValue === Complain::STATUS_IN_PROGRESS) {
-            $complain->assigned_at = now(); 
-        }
-    
-        if ($nextStatusValue === Complain::STATUS_RESOLVED) {
-            $complain->resolved_at = now();
-            if ($complain->user) {
-                $complain->user->increment('score'); 
-            }
-        }
-    
-        // حفظ كل التغييرات في قاعدة البيانات
-        $complain->save();
+    }
+
+    $complain->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => "Status updated from {$previousStatus} to {$nextStatusValue}",
+        'data' => [
+            'id'             => $complain->id,
+            'current_status' => $complain->status,
+            'assigned_level' => $complain->assigned_level,
+            'level_name'     => $user->role->name,
+            'user_new_score' => $complain->user ? $complain->user->score : 0
+        ]
+    ], 200);
+
     
         // إرسال الإشعار (نمرر القيمة النصية وليس المصفوفة)
         $this->sendStatusEmail($complain, $nextStatusValue);

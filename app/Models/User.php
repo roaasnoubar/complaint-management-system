@@ -112,6 +112,10 @@ class User extends Authenticatable
     {
         return $this->isAdmin() || $this->isManager() || $this->isDeptManager() || $this->isEmployee();
     }
+    public function hasRole(string $roleName): bool
+{
+    return $this->role && $this->role->name === $roleName;
+}
     public function hasPermission(string $permissionName): bool
     {
         return $this->role?->permissions()
