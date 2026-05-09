@@ -147,6 +147,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('manage-complaints', ComplaintController::class)
               ->names('employee.manage.complaints')
               ->only(['index', 'show']);
+        Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
+
     });
 
     // --- 4. نظام الشكاوى (المستخدم العادي) ---
@@ -183,7 +185,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/clear-all', [NotificationController::class, 'deleteAll']);
         Route::delete('/{id}',      [NotificationController::class, 'destroy']);
     });
-    Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
 
     Route::middleware('auth:sanctum')->group(function () {
 

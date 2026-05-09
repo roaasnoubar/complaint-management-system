@@ -18,7 +18,7 @@ class ComplainResource extends JsonResource
         'id' => $this->id,
         'complain_number' => $this->complain_number,
         'status' => $this->status,
-        'notes' => $this->notes, // هذا هو الحقل الذي كان ينقصنا
+        'notes' => $this->admin_reply ?? $this->notes,
         'full_name' => $this->full_name,
         'description' => $this->description,
         'can_chat' => $this->can_chat,

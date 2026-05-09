@@ -30,6 +30,8 @@ class Complain extends Model
         'assigned_level',
         'assigned_at',
         'resolved_at',
+        'notes',
+        'admin_reply',
     ];
 
     // إضافة الحقول الوهمية للـ JSON لسهولة التعامل مع الأندرويد

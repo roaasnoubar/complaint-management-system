@@ -490,9 +490,9 @@ public function respond(Request $request, $id)
 {
     // 1. التحقق من المدخلات (النص، وحالة الشكوى، وصحة الشكوى للنقاط)
     $request->validate([
-        'reply' => 'required|string|min:5',
+        'reply' => 'required|string|min:5|max:1000',
         'status' => 'required|in:Resolved,Rejected',
-        'is_valid' => 'required|boolean' // الموظف يحدد إذا كانت الشكوى صادقة أم كاذبة
+        'is_valid' => 'required|boolean'// الموظف يحدد إذا كانت الشكوى صادقة أم كاذبة
     ]);
 
     // 2. جلب الشكوى مع المستخدم صاحب الشكوى
