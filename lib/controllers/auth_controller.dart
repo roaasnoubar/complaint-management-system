@@ -1,7 +1,9 @@
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+
 import '../core/routes/app_routes.dart';
 import '../models/user_model.dart';
+import '../core/storage/token_storage.dart';
 import '../services/auth_service.dart';
 
 class AuthController extends GetxController {
@@ -11,19 +13,19 @@ class AuthController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
   final GetStorage _storage = GetStorage();
 
+  /// البريد الإلكتروني المؤقت لاستخدامه في التحقق OTP
   String? tempEmail;
 
-  Future<void> login(String email, String password) async {
+  // ──────────────────────────────────────────────
+  // تسجيل الدخول
+  // ──────────────────────────────────────────────
+  Future<void> login(String username, String password) async {
     isLoading.value = true;
     try {
-      final user = await _authService.login(email, password);
-
-      if (user != null) {
-        _saveUserSession(user);
-        currentUser.value = user;
-
-        Get.offAllNamed('/dashboard');
-      }
+      final user = await _authService.login(username, password);
+      _saveUserSession(user);
+      currentUser.value = user;
+      _handleRoleBasedNavigation(user);
     } catch (e) {
       _showError('فشل تسجيل الدخول', e);
     } finally {
@@ -31,6 +33,9 @@ class AuthController extends GetxController {
     }
   }
 
+  // ──────────────────────────────────────────────
+  // التسجيل
+  // ──────────────────────────────────────────────
   Future<void> register({
     required String name,
     required String email,
@@ -40,7 +45,7 @@ class AuthController extends GetxController {
   }) async {
     isLoading.value = true;
     try {
-      await _authService.register(
+      final user = await _authService.register(
         name: name,
         email: email,
         password: password,
@@ -49,14 +54,13 @@ class AuthController extends GetxController {
       );
 
       tempEmail = email;
-
-      _storage.write('isLoggedIn', true);
-      _storage.write('isEmailVerified', false);
+      currentUser.value = user;
 
       Get.snackbar(
         'تم إرسال الرمز',
-        'يرجى التحقق من بريدك الإلكتروني',
+        'يرجى التحقق من بريدك الإلكتروني لرمز OTP',
         snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 4),
       );
 
       Get.toNamed(Routes.OTP);
@@ -67,29 +71,25 @@ class AuthController extends GetxController {
     }
   }
 
+  // ──────────────────────────────────────────────
+  // التحقق من OTP
+  // ──────────────────────────────────────────────
   Future<void> verifyOtp(String code) async {
     if (tempEmail == null) {
-      Get.snackbar("خطأ", "لم يتم العثور على البريد الإلكتروني");
+      Get.snackbar('خطأ', 'لم يتم العثور على البريد الإلكتروني');
       return;
     }
 
     isLoading.value = true;
     try {
       final bool isVerified = await _authService.verifyEmail(tempEmail!, code);
-
       if (isVerified) {
+        _storage.write('isLoggedIn', true);
         _storage.write('isEmailVerified', true);
-
-        // ملاحظة: من الأفضل هنا تحديث بيانات المستخدم لتشمل الاسم في التخزين
-        // لكي يظهر في الداشبورد فوراً
-
-        Get.snackbar(
-          'نجاح',
-          'تم تفعيل حسابك، مرحباً بك في تطبيق إدارة الشكاوي',
-        );
-
-        // التعديل: الانتقال النهائي للداشبورد مع مسح الذاكرة للصفحات السابقة
-        Get.offAllNamed('/dashboard');
+        if (currentUser.value != null) {
+          _saveUserSession(currentUser.value!);
+          _handleRoleBasedNavigation(currentUser.value!);
+        }
       }
     } catch (e) {
       _showError('فشل التحقق', e);
@@ -98,21 +98,60 @@ class AuthController extends GetxController {
     }
   }
 
-  void logout() {
+  // ──────────────────────────────────────────────
+  // تسجيل الخروج
+  // ──────────────────────────────────────────────
+  Future<void> logout() async {
+    await TokenStorage.clear();
     _storage.erase();
     currentUser.value = null;
     Get.offAllNamed(Routes.LOGIN);
   }
 
+  // ──────────────────────────────────────────────
+  // التوجيه حسب الدور
+  // ──────────────────────────────────────────────
+  void _handleRoleBasedNavigation(UserModel user) {
+    final String role = user.roleName?.toLowerCase().trim() ?? 'citizen';
+
+    switch (role) {
+      case 'manager':
+        // مدير القسم
+        Get.offAllNamed(Routes.MANAGER_DASHBOARD);
+        break;
+      case 'official':
+        // مدير الجهة
+        Get.offAllNamed(Routes.AUTHORITY_DASHBOARD);
+        break;
+      case 'employee':
+        // الموظف
+        Get.offAllNamed(Routes.EMPLOYEE_DASHBOARD);
+        break;
+      case 'citizen':
+      default:
+        // المواطن
+        Get.offAllNamed(Routes.DASHBOARD);
+        break;
+    }
+  }
+
   void _saveUserSession(UserModel user) {
     _storage.write('isLoggedIn', true);
     _storage.write('isEmailVerified', true);
+    _storage.write('user_role', user.roleName);
     _storage.write('user_data', user.toJson());
   }
 
   void _showError(String title, Object e) {
     String message = e.toString().replaceAll('Exception: ', '');
-    if (message.contains("1062")) message = "هذا البريد مسجل مسبقاً";
-    Get.snackbar(title, message, snackPosition: SnackPosition.BOTTOM);
+    if (message.contains('1062')) {
+      message = 'هذا البريد الإلكتروني مستخدم بالفعل';
+    }
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 4),
+    );
   }
 }

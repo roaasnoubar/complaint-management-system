@@ -1,18 +1,43 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 // Routes & Middleware
 import 'app_routes.dart';
 import '../../middleware/auth_middleware.dart';
 
-// Screens
+// Auth Screens
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/register_screen.dart';
 import '../../screens/auth/otp_screen.dart';
-import '../../screens/home/home_screen.dart';
-import '../../screens/splash/splash_screen.dart';
 import '../../screens/auth/dashboard_view.dart';
+import '../../screens/auth/complaint_form_page.dart';
+import '../../screens/auth/success_page.dart';
+import '../../screens/auth/tracking_screen.dart';
+
+// Home
+import '../../screens/home/home_screen.dart';
+
+// Chat
+import '../../screens/chat/chat_screen.dart';
+
+// Splash
+import '../../screens/splash/splash_screen.dart';
+
+// Employee Screens
+import '../../screens/employee/complaint_details_page.dart';
+import '../../screens/employee/employee_dashboard_page.dart';
+import '../../screens/employee/employee_complaints_list_page.dart';
+
+// Department Manager Screens
+import '../../screens/department_manager/department_manager_dashboard_screen.dart';
+import '../../screens/department_manager/department_complaints_screen.dart';
+import '../../screens/department_manager/department_complaint_detail_screen.dart';
+import '../../screens/department_manager/create_employee_screen.dart';
+
+// Bindings
 import '../../bindings/dashboard_binding.dart';
+import '../../bindings/initial_binding.dart';
+import '../../bindings/employee_binding.dart';
+import '../../bindings/department_manager_binding.dart';
 
 abstract class AppPages {
   AppPages._();
@@ -20,96 +45,128 @@ abstract class AppPages {
   static const String INITIAL = Routes.SPLASH;
 
   static final List<GetPage<dynamic>> pages = <GetPage<dynamic>>[
-    GetPage<void>(name: Routes.SPLASH, page: () => const SplashScreen()),
+
+    // ──────────────────────────────────────────────
+    // Splash & Auth
+    // ──────────────────────────────────────────────
+    GetPage<void>(
+      name: Routes.SPLASH,
+      page: () => const SplashScreen(),
+      binding: InitialBinding(),
+    ),
 
     GetPage<void>(
       name: Routes.LOGIN,
       page: () => const LoginScreen(),
       middlewares: [AuthMiddleware()],
+      transition: Transition.native,
     ),
 
     GetPage<void>(
       name: Routes.REGISTER,
       page: () => const RegisterScreen(),
       middlewares: [AuthMiddleware()],
+      transition: Transition.native,
     ),
 
-    GetPage<void>(name: Routes.OTP, page: () => OtpScreen()),
+    GetPage<void>(
+      name: Routes.OTP,
+      page: () => const OtpScreen(),
+    ),
 
-    GetPage(
-      name: '/dashboard',
+    // ──────────────────────────────────────────────
+    // Citizen — المواطن
+    // ──────────────────────────────────────────────
+    GetPage<void>(
+      name: Routes.DASHBOARD,
       page: () => const DashboardView(),
       binding: DashboardBinding(),
-      middlewares: [AuthMiddleware()],
-      transition: Transition.fadeIn,
+    ),
+
+    GetPage<void>(
+      name: Routes.ADD_COMPLAINT,
+      page: () => ComplaintFormPage(),
+    ),
+
+    GetPage<void>(
+      name: Routes.SUCCESS,
+      page: () {
+        final dynamic args = Get.arguments;
+        final String complaintId =
+            (Get.parameters['complaintId'] ??
+                    (args is Map ? args['complaintId'] : args))
+                ?.toString() ??
+            '';
+        return SuccessPage(complaintId: complaintId);
+      },
+    ),
+
+    GetPage<void>(
+      name: Routes.TRACKING,
+      page: () => TrackingScreen(),
     ),
 
     GetPage<void>(
       name: Routes.HOME,
       page: () => HomeScreen(),
-      middlewares: [AuthMiddleware()],
+      transition: Transition.fadeIn,
     ),
 
-    GetPage<void>(
-      name: Routes.PROFILE,
-      page: () => const _DevPlaceholder(Routes.PROFILE),
-      middlewares: [AuthMiddleware()],
-    ),
-
-    GetPage<void>(
-      name: Routes.ADD_COMPLAINT,
-      page: () => const _DevPlaceholder(Routes.ADD_COMPLAINT),
-      middlewares: [AuthMiddleware()],
-    ),
-
-    GetPage<void>(
-      name: Routes.MY_COMPLAINTS,
-      page: () => const _DevPlaceholder(Routes.MY_COMPLAINTS),
-      middlewares: [AuthMiddleware()],
-    ),
-
-    GetPage<void>(
-      name: Routes.AUTHORITY_DASHBOARD,
-      page: () => const _DevPlaceholder(Routes.AUTHORITY_DASHBOARD),
-      middlewares: [AuthMiddleware()],
-    ),
-
+    // ──────────────────────────────────────────────
+    // Chat — مشترك بين جميع الأدوار
+    // ──────────────────────────────────────────────
     GetPage<void>(
       name: Routes.CHAT,
-      page: () => const _DevPlaceholder(Routes.CHAT),
-      middlewares: [AuthMiddleware()],
+      page: () => ChatScreen(),
+    ),
+
+    // ──────────────────────────────────────────────
+    // Employee — الموظف
+    // ──────────────────────────────────────────────
+    GetPage<void>(
+      name: Routes.EMPLOYEE_DASHBOARD,
+      page: () => const EmployeeDashboardPage(),
     ),
 
     GetPage<void>(
-      name: Routes.NOTIFICATIONS,
-      page: () => const _DevPlaceholder(Routes.NOTIFICATIONS),
-      middlewares: [AuthMiddleware()],
+      name: Routes.EMPLOYEE_COMPLAINTS,
+      page: () => const EmployeeComplaintsListPage(),
+      binding: EmployeeBinding(),
+      transition: Transition.cupertino,
+    ),
+
+    GetPage<void>(
+      name: Routes.COMPLAINT_DETAILS,
+      page: () => const ComplaintDetailsPage(),
+    ),
+
+    // ──────────────────────────────────────────────
+    // Department Manager — مدير القسم
+    // ──────────────────────────────────────────────
+    GetPage<void>(
+      name: Routes.MANAGER_DASHBOARD,
+      page: () => const DepartmentManagerDashboardScreen(),
+      binding: DepartmentManagerBinding(),
+      transition: Transition.fadeIn,
+    ),
+
+    GetPage<void>(
+      name: Routes.MANAGER_COMPLAINTS,
+      page: () => const DepartmentComplaintsScreen(),
+      binding: DepartmentManagerBinding(),
+      transition: Transition.cupertino,
+    ),
+
+    GetPage<void>(
+      name: Routes.MANAGER_COMPLAINT_DETAIL,
+      page: () => const DepartmentComplaintDetailScreen(),
+      transition: Transition.cupertino,
+    ),
+
+    GetPage<void>(
+      name: Routes.MANAGER_CREATE_EMPLOYEE,
+      page: () => const CreateEmployeeScreen(),
+      transition: Transition.cupertino,
     ),
   ];
-}
-
-class _DevPlaceholder extends StatelessWidget {
-  const _DevPlaceholder(this.routePath);
-  final String routePath;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(routePath), centerTitle: true),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.construction, size: 80, color: Colors.orange),
-            const SizedBox(height: 20),
-            Text(
-              "جاري العمل على واجهة:\n$routePath",
-              style: Theme.of(context).textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

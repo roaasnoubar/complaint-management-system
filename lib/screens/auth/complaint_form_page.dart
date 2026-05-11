@@ -3,6 +3,9 @@ import 'package:get/get.dart';
 import '../../../controllers/complaint_controller.dart';
 
 class ComplaintFormPage extends StatelessWidget {
+  ComplaintFormPage({super.key});
+
+  // استخدام Get.find إذا كان الكنترولر قد تم حقنه مسبقاً، أو Get.put إذا كانت هذه صفحة البداية
   final controller = Get.put(ComplaintController());
 
   @override
@@ -12,10 +15,11 @@ class ComplaintFormPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'تقديم شكوى جديدة',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF006064),
         centerTitle: true,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -26,15 +30,23 @@ class ComplaintFormPage extends StatelessWidget {
             _buildTextField(
               label: "الاسم الكامل",
               hint: "الاسم الثلاثي بالعربية أو الإنجليزية",
-              controller: controller.nameController,
+              controller: controller.fullNameController,
             ),
             const SizedBox(height: 20),
 
             _buildSectionTitle("بيانات الشكوى"),
-            _buildDropdownField(),
+            _buildAuthorityDropdown(),
+            const SizedBox(height: 12),
+            _buildDepartmentDropdown(),
             const SizedBox(height: 15),
             _buildTextField(
-              label: "الرسالة",
+              label: "عنوان الشكوى",
+              hint: "عنوان مختصر وواضح",
+              controller: controller.titleController,
+            ),
+            const SizedBox(height: 15),
+            _buildTextField(
+              label: "وصف الشكوى",
               hint: "اكتب تفاصيل شكواك هنا...",
               controller: controller.descriptionController,
               maxLines: 5,
@@ -75,7 +87,13 @@ class ComplaintFormPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFF00838F))),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF00838F),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
@@ -84,9 +102,17 @@ class ComplaintFormPage extends StatelessWidget {
             hintText: hint,
             filled: true,
             fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white, width: 0),
             ),
           ),
         ),
@@ -94,33 +120,62 @@ class ComplaintFormPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDropdownField() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: Obx(
-          () => DropdownButton<int>(
-            isExpanded: true,
-            value: controller.selectedDepartmentId.value == 0
-                ? null
-                : controller.selectedDepartmentId.value,
-            hint: const Text("نوع الشكوى"),
-            items: [
-              const DropdownMenuItem(
-                value: 1,
-                child: Text("شكوى ضد متجر إلكتروني"),
-              ),
-              const DropdownMenuItem(value: 2, child: Text("شكوى تقنية")),
-            ],
-            onChanged: (val) => controller.selectedDepartmentId.value = val!,
+  Widget _buildAuthorityDropdown() {
+    return Obx(() {
+      return DropdownButtonFormField<int>(
+        value: controller.selectedAuthorityId.value == 0
+            ? null
+            : controller.selectedAuthorityId.value,
+        decoration: InputDecoration(
+          labelText: 'الجهة',
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
         ),
-      ),
-    );
+        items: controller.authorities.entries
+            .map(
+              (e) => DropdownMenuItem<int>(value: e.key, child: Text(e.value)),
+            )
+            .toList(),
+        onChanged: (val) {
+          controller.selectedAuthorityId.value = val ?? 0;
+          controller.selectedDepartmentId.value = 0;
+        },
+      );
+    });
+  }
+
+  Widget _buildDepartmentDropdown() {
+    return Obx(() {
+      final departments = controller.currentDepartments;
+      return DropdownButtonFormField<int>(
+        // نستخدم key لإجبار الـ Dropdown على إعادة البناء عند تغيير الجهة لتصفير القيمة
+        key: ValueKey(controller.selectedAuthorityId.value),
+        value: controller.selectedDepartmentId.value == 0
+            ? null
+            : controller.selectedDepartmentId.value,
+        decoration: InputDecoration(
+          labelText: 'القسم',
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        items: departments.entries
+            .map(
+              (e) => DropdownMenuItem<int>(value: e.key, child: Text(e.value)),
+            )
+            .toList(),
+        onChanged: departments.isEmpty
+            ? null
+            : (val) => controller.selectedDepartmentId.value = val ?? 0,
+      );
+    });
   }
 
   Widget _buildAttachmentBox() {
@@ -130,10 +185,7 @@ class ComplaintFormPage extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: const Color(0xFF00838F).withOpacity(0.3),
-          style: BorderStyle.solid,
-        ),
+        border: Border.all(color: const Color(0xFF00838F).withOpacity(0.3)),
       ),
       child: Column(
         children: [
@@ -142,12 +194,26 @@ class ComplaintFormPage extends StatelessWidget {
             size: 40,
             color: Color(0xFF00838F),
           ),
-          const Text("أضف صوراً أو ملفات توضيحية"),
+          const SizedBox(height: 8),
+          Obx(() {
+            final count = controller.attachmentPaths.length;
+            return Text(
+              count == 0
+                  ? "أضف صوراً أو ملفات توضيحية"
+                  : "تم اختيار $count ملف/ملفات",
+              style: TextStyle(
+                color: count == 0 ? Colors.grey : const Color(0xFF006064),
+              ),
+            );
+          }),
           TextButton(
             onPressed: () => controller.pickAttachment(),
             child: const Text(
               "اختر ملفاً",
-              style: TextStyle(color: Color(0xFF00838F)),
+              style: TextStyle(
+                color: Color(0xFF00838F),
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -159,17 +225,27 @@ class ComplaintFormPage extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: 55,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF00838F),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+      child: Obx(
+        () => ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00838F),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
-        ),
-        onPressed: () => controller.submitComplaint(),
-        child: const Text(
-          "تقديم الشكوى",
-          style: TextStyle(fontSize: 18, color: Colors.white),
+          onPressed: controller.isUploading.value
+              ? null
+              : () => controller.submitComplaint(),
+          child: controller.isUploading.value
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text(
+                  "تقديم الشكوى",
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
         ),
       ),
     );

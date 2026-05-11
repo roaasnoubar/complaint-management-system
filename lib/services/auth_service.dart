@@ -1,27 +1,42 @@
 import 'package:dio/dio.dart';
 import '../models/user_model.dart';
+import '../core/constants/api_constants.dart';
 import 'base_client.dart';
+import '../core/storage/token_storage.dart';
+import 'dio_client.dart';
 
 class AuthService {
-  AuthService({Dio? dio}) : _dio = dio ?? BaseClient.dio;
-
+  AuthService({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
   final Dio _dio;
 
-  static const String _loginPath = 'auth/login';
-  static const String _registerPath = 'auth/register';
-  static const String _verifyOtpPath = 'auth/verify-email';
-
-  Future<UserModel> login(String name, String password) async {
+  /// POST /auth/login
+  Future<UserModel> login(String username, String password) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        _loginPath,
-        data: <String, dynamic>{'username': name, 'password': password},
+      print(
+        "DEBUG: Connecting to Login URL -> ${ApiConstants.baseUrl}${ApiConstants.login}",
       );
 
-      final data = response.data;
-      if (data == null) throw Exception('لا توجد بيانات في الاستجابة');
+      final response = await _dio.post<dynamic>(
+        ApiConstants.login,
+        data: {'username': username, 'password': password},
+      );
 
-      return _parseUserFromResponse(data);
+      final user = _parseUserFromResponse(response.data);
+      if ((user.token ?? '').trim().isNotEmpty) {
+        await TokenStorage.save(user.token!);
+      }
+      return user;
+    } on DioException catch (e) {
+      print("DEBUG: Dio Error during Login -> ${e.message}");
+      print("DEBUG: Error Details -> ${e.response?.data}");
+      throw Exception(BaseClient.handleError(e));
+    }
+  }
+
+  Future<UserModel> me() async {
+    try {
+      final response = await _dio.get<dynamic>(ApiConstants.me);
+      return _parseUserFromResponse(response.data);
     } on DioException catch (e) {
       throw Exception(BaseClient.handleError(e));
     }
@@ -35,62 +50,70 @@ class AuthService {
     required String birthdate,
   }) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        _registerPath,
+      // --- سطر كشف الخطأ (Debug Line) ---
+      print(
+        "DEBUG: Connecting to Register URL -> ${ApiConstants.baseUrl}${ApiConstants.register}",
+      );
+
+      final response = await _dio.post<dynamic>(
+        ApiConstants.register,
         data: <String, dynamic>{
           'name': name,
           'email': email,
-          'password': password,
-          'password_confirmation': password,
           'phone': phone,
           'birthdate': birthdate,
+          'password': password,
+          'password_confirmation': password,
         },
       );
-
-      final data = response.data;
-      if (data == null) throw Exception('فشل في جلب الاستجابة من السيرفر');
-
-      return _parseUserFromResponse(data);
+      return _parseUserFromResponse(response.data);
     } on DioException catch (e) {
+      print("DEBUG: Dio Error during Register -> ${e.message}");
       throw Exception(BaseClient.handleError(e));
     }
   }
 
+  /// POST /auth/verify-email
   Future<bool> verifyEmail(String email, String code) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        _verifyOtpPath,
-        data: <String, dynamic>{'email': email, 'code': code},
+      final response = await _dio.post(
+        ApiConstants.verifyEmail,
+        data: {'email': email, 'code': code},
       );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
-      }
-      return false;
+      return response.statusCode == 200 || response.statusCode == 201;
     } on DioException catch (e) {
       throw Exception(BaseClient.handleError(e));
     }
   }
 
-  static UserModel _parseUserFromResponse(Map<String, dynamic> data) {
-    Map<String, dynamic>? userMap;
-
-    if (data['user'] is Map<String, dynamic>) {
-      userMap = data['user'];
-    } else if (data['data'] is Map<String, dynamic>) {
-      final nested = data['data'];
-      userMap = (nested['user'] is Map<String, dynamic>)
-          ? nested['user']
-          : nested;
-    } else if (data.containsKey('user_id') || data.containsKey('id')) {
-      userMap = data;
+  static UserModel _parseUserFromResponse(dynamic responseData) {
+    if (responseData == null) {
+      throw Exception('استجابة فارغة من السيرفر');
+    }
+    if (responseData is! Map) {
+      throw Exception('تنسيق استجابة غير صالح');
     }
 
-    if (userMap == null) {
-      throw Exception('تعذر العثور على بيانات المستخدم في رد السيرفر');
-    }
+    final root = Map<String, dynamic>.from(responseData);
 
-    final normalized = Map<String, dynamic>.from(userMap);
-    return UserModel.fromJson(normalized);
+    final dynamic data = root['data'];
+    final Map<String, dynamic> container = (data is Map)
+        ? Map<String, dynamic>.from(data)
+        : root;
+
+    final dynamic nestedUser = container['user'] ?? container['user_data'];
+    final Map<String, dynamic> userMap = (nestedUser is Map)
+        ? Map<String, dynamic>.from(nestedUser)
+        : Map<String, dynamic>.from(container);
+
+    final String? token =
+        (container['token'] ??
+                container['access_token'] ??
+                root['token'] ??
+                root['access_token'])
+            ?.toString();
+    if (token != null && token.isNotEmpty) userMap['token'] = token;
+
+    return UserModel.fromJson(userMap);
   }
 }

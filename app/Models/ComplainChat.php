@@ -20,18 +20,30 @@ class ComplainChat extends Model
         'closed_at' => 'datetime',
     ];
 
+    /**
+     * العلاقة مع الشكوى الأساسية
+     */
     public function complain(): BelongsTo
     {
         return $this->belongsTo(Complain::class, 'complain_id');
     }
 
+    /**
+     * العلاقة مع صاحب الشكوى (مقدم الشكوى)
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * العلاقة مع الرسائل
+     * تنبيه: تأكدي أن اسم الموديل عندك هو ChatMessage 
+     * إذا كان لا يزال CantMessage اتركيها كما هي، لكن الأفضل برمجياً توحيدها.
+     */
     public function messages(): HasMany
     {
-        return $this->hasMany(CantMessage::class, 'chat_id');
+        // سأضع ChatMessage لأنه الاسم المعتمد في الكنترولر والميجريشن
+        return $this->hasMany(ChatMessage::class, 'chat_id');
     }
 }

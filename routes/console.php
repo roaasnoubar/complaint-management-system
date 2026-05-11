@@ -1,8 +1,10 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use App\Console\Commands\EscalateComplaints;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// هذا السطر سيجبر لارافيل على تسجيل الكلاس والأمر go
+Artisan::command('go', function () {
+    $command = new EscalateComplaints();
+    $command->handle();
+})->purpose('تصعيد الشكاوى آلياً');

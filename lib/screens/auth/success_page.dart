@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../core/routes/app_routes.dart';
 
 class SuccessPage extends StatelessWidget {
   final String complaintId;
@@ -8,6 +9,11 @@ class SuccessPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dynamic args = Get.arguments;
+    final String resolvedId = complaintId.isNotEmpty
+        ? complaintId
+        : ((args is Map ? args['complaintId'] : args)?.toString() ?? '');
+
     return Scaffold(
       backgroundColor: const Color(0xFFE0F7FA),
       body: Center(
@@ -22,7 +28,7 @@ class SuccessPage extends StatelessWidget {
                 color: Color(0xFF00838F),
               ),
               const SizedBox(height: 20),
-              Text(
+              const Text(
                 "تم تقديم الشكوى بنجاح",
                 style: TextStyle(
                   fontSize: 24,
@@ -30,14 +36,14 @@ class SuccessPage extends StatelessWidget {
                   color: Color(0xFF006064),
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
                 "رقم الشكوى الخاص بك هو:",
                 style: TextStyle(fontSize: 16, color: Colors.grey[700]),
               ),
               Text(
-                "#$complaintId",
-                style: TextStyle(
+                "#$resolvedId",
+                style: const TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w900,
                   color: Color(0xFF00838F),
@@ -50,11 +56,19 @@ class SuccessPage extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00838F),
                     padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  onPressed: () => Get.offAllNamed('/home'), // العودة للرئيسية
+                  onPressed: () {
+                    // التعديل الجوهري هنا:
+                    // نقوم بالتوجه لصفحة لوحة التحكم مباشرة ومسح السجل
+                    // تأكدي أن اسم المسار في ملف app_routes هو DASHBOARD أو حسب تسميتك له
+                    Get.offAllNamed(Routes.DASHBOARD);
+                  },
                   child: const Text(
                     "العودة للرئيسية",
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                 ),
               ),

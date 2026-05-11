@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/storage/token_storage.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,9 +14,14 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      Get.offAllNamed(Routes.HOME);
-    });
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    // Keep a short splash, but decide routing based on secure token presence.
+    await Future.delayed(const Duration(milliseconds: 1500));
+    final route = TokenStorage.hasToken ? Routes.HOME : Routes.LOGIN;
+    Get.offNamed(route);
   }
 
   @override

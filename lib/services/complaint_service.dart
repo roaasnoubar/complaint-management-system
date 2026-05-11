@@ -1,124 +1,210 @@
 import 'package:dio/dio.dart';
 
 import '../models/complaint_model.dart';
+import '../core/constants/api_constants.dart';
 import 'base_client.dart';
+import 'dio_client.dart';
 
 class ComplaintService {
-  ComplaintService({Dio? dio}) : _dio = dio ?? BaseClient.dio;
+  ComplaintService({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
 
   final Dio _dio;
 
-  Future<ComplaintModel> createComplaint(ComplaintModel complaint) async {
+  // ──────────────────────────────────────────────
+  // 1. تقديم شكوى جديدة (المواطن)
+  // ──────────────────────────────────────────────
+  Future<ComplaintModel> storeComplaint({
+    required String fullName,
+    required String title,
+    required String description,
+    required int authorityId,
+    required int departmentId,
+    List<String> attachmentPaths = const <String>[],
+  }) async {
     try {
-      final payload = Map<String, dynamic>.from(complaint.toJson())
-        ..removeWhere((_, v) => v == null);
-      final response = await _dio.post<dynamic>('/complaints', data: payload);
-      return _parseComplaintFromResponse(response.data);
-    } on DioException catch (e) {
-      throw Exception(BaseClient.handleError(e));
-    } on FormatException {
-      throw Exception('تعذر قراءة بيانات الشكوى');
-    }
-  }
+      final List<MultipartFile> attachments = <MultipartFile>[];
+      for (final path in attachmentPaths) {
+        if (path.trim().isEmpty) continue;
+        attachments.add(await MultipartFile.fromFile(path.trim()));
+      }
 
-  Future<List<ComplaintModel>> getMyComplaints() async {
-    try {
-      final response = await _dio.get<dynamic>('/my-complaints');
-      final raw = _unwrapList(response.data);
-      return raw.map(_complaintFromDynamic).toList();
-    } on DioException catch (e) {
-      throw Exception(BaseClient.handleError(e));
-    } on FormatException {
-      throw Exception('تعذر قراءة قائمة الشكاوى');
-    }
-  }
+      final FormData formData = FormData.fromMap(<String, dynamic>{
+        'full_name': fullName,
+        'title': title,
+        'description': description,
+        'authority_id': authorityId,
+        'department_id': departmentId,
+        if (attachments.isNotEmpty) 'attachments[]': attachments,
+      });
 
-  Future<List<ComplaintModel>> getAuthorityComplaints() async {
-    try {
-      final response = await _dio.get<dynamic>('/authority/complaints');
-      final raw = _unwrapList(response.data);
-      return raw.map(_complaintFromDynamic).toList();
-    } on DioException catch (e) {
-      throw Exception(BaseClient.handleError(e));
-    } on FormatException {
-      throw Exception('تعذر قراءة قائمة الشكاوى');
-    }
-  }
-
-  Future<ComplaintModel> updateComplaintStatus(
-    int id,
-    String status,
-    String responseText,
-  ) async {
-    try {
       final response = await _dio.post<dynamic>(
-        '/complaints/update-status',
-        data: <String, dynamic>{
-          'complaint_id': id,
-          'status': status,
-          'response_text': responseText,
-        },
+        ApiConstants.storeComplaint,
+        data: formData,
       );
       return _parseComplaintFromResponse(response.data);
     } on DioException catch (e) {
+      final msg = e.response?.data is Map
+          ? e.response!.data['message'] ?? BaseClient.handleError(e)
+          : BaseClient.handleError(e);
+      throw Exception(msg);
+    } catch (e) {
+      throw Exception('حدث خطأ غير متوقع أثناء تقديم الشكوى');
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // 2. جلب الشكاوي حسب الحالة
+  // ──────────────────────────────────────────────
+  Future<List<ComplaintModel>> getComplaintsByStatus(String status) async {
+    try {
+      final String backendStatus = _mapStatusToBackend(status);
+      final response = await _dio.get<dynamic>(
+        ApiConstants.filterComplaints(backendStatus),
+      );
+      return _parseComplaintList(response.data);
+    } on DioException catch (e) {
       throw Exception(BaseClient.handleError(e));
-    } on FormatException {
-      throw Exception('تعذر قراءة بيانات الشكوى');
+    } catch (e) {
+      throw Exception('حدث خطأ أثناء جلب قائمة الشكاوى');
     }
   }
 
-  static List<dynamic> _unwrapList(dynamic body) {
-    if (body == null) {
-      throw const FormatException('Empty response body');
+  // ──────────────────────────────────────────────
+  // 3. جلب جميع الشكاوي
+  // ──────────────────────────────────────────────
+  Future<List<ComplaintModel>> getAllComplaints() async {
+    try {
+      final response = await _dio.get<dynamic>(ApiConstants.allComplaints);
+      return _parseComplaintList(response.data);
+    } on DioException catch (e) {
+      throw Exception(BaseClient.handleError(e));
+    } catch (e) {
+      throw Exception('حدث خطأ أثناء جلب الشكاوى');
     }
-    if (body is List<dynamic>) {
-      return body;
-    }
-    if (body is Map) {
-      final data = body['data'];
-      if (data is List<dynamic>) {
-        return data;
+  }
+
+  // ──────────────────────────────────────────────
+  // 4. جلب تفاصيل شكوى بالـ ID
+  // ──────────────────────────────────────────────
+  Future<ComplaintModel> getComplaintById(int id) async {
+    try {
+      final response = await _dio.get<dynamic>(ApiConstants.viewComplaint(id));
+      return _parseComplaintFromResponse(response.data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        throw Exception('رقم الشكوى غير موجود، يرجى التأكد من الرقم');
       }
+      throw Exception(BaseClient.handleError(e));
+    } catch (e) {
+      throw Exception('حدث خطأ أثناء جلب بيانات الشكوى');
     }
-    throw const FormatException(
-      'Expected a JSON array or an object with a "data" array',
-    );
   }
 
-  static ComplaintModel _complaintFromDynamic(dynamic item) {
-    if (item is! Map) {
-      throw const FormatException('Complaint item must be an object');
+  // ──────────────────────────────────────────────
+  // 5. تغيير حالة الشكوى
+  // ──────────────────────────────────────────────
+  Future<bool> updateComplaintStatus(int id, String status) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        ApiConstants.updateStatus(id),
+        data: {'status': _mapStatusToBackend(status)},
+      );
+      final data = response.data;
+      if (data is Map) {
+        return data['success'] == true || response.statusCode == 200;
+      }
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw Exception(BaseClient.handleError(e));
+    } catch (e) {
+      throw Exception('تعذر تحديث حالة الشكوى');
     }
-    return ComplaintModel.fromJson(Map<String, dynamic>.from(item));
+  }
+
+  // ──────────────────────────────────────────────
+  // 6. الرد الرسمي وإغلاق الشكوى
+  // ──────────────────────────────────────────────
+  Future<bool> respondToComplaint(int id, String reply) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        ApiConstants.respondToComplaint(id),
+        data: {'reply': reply},
+      );
+      final data = response.data;
+      if (data is Map) {
+        return data['success'] == true || response.statusCode == 200;
+      }
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw Exception(BaseClient.handleError(e));
+    } catch (e) {
+      throw Exception('تعذر إرسال الرد');
+    }
+  }
+
+  Future<ComplaintModel> trackComplaint(String complaintId) async {
+    try {
+      final id = int.tryParse(complaintId);
+      if (id == null) throw Exception('رقم الشكوى غير صالح');
+      final response = await _dio.get<dynamic>(ApiConstants.viewComplaint(id));
+      return _parseComplaintFromResponse(response.data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        throw Exception('رقم الشكوى غير موجود، يرجى التأكد من الرقم');
+      }
+      throw Exception(BaseClient.handleError(e));
+    } catch (e) {
+      throw Exception('حدث خطأ أثناء تتبع الشكوى');
+    }
+  }
+
+  String _mapStatusToBackend(String status) {
+    switch (status.toLowerCase()) {
+      case 'new':
+      case 'pending':
+        return ApiConstants.statusPending; // "Pending"
+      case 'in_progress':
+      case 'in progress':
+        return ApiConstants.statusInProgress; // "In Progress"
+      case 'closed':
+      case 'resolved':
+        return ApiConstants.statusResolved; // "Resolved"
+      default:
+        return status;
+    }
+  }
+
+  List<ComplaintModel> _parseComplaintList(dynamic data) {
+    if (data == null) return [];
+    List<dynamic> rawList = [];
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      if (map['data'] is List) {
+        rawList = map['data'] as List;
+      } else if (map['complaints'] is List) {
+        rawList = map['complaints'] as List;
+      }
+    } else if (data is List) {
+      rawList = data;
+    }
+    return rawList
+        .whereType<Map>()
+        .map((e) => ComplaintModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   static ComplaintModel _parseComplaintFromResponse(dynamic body) {
-    if (body == null) {
-      throw const FormatException('Empty response body');
-    }
-    if (body is! Map) {
-      throw const FormatException('Expected a JSON object');
-    }
-    final map = Map<String, dynamic>.from(body);
-
+    if (body == null) throw const FormatException('الرد فارغ من السيرفر');
+    final map = Map<String, dynamic>.from(body as Map);
     final data = map['data'];
     if (data is Map) {
-      return ComplaintModel.fromJson(Map<String, dynamic>.from(data));
+      final payload = Map<String, dynamic>.from(data);
+      final nested = payload['complaint'];
+      if (nested is Map) {
+        return ComplaintModel.fromJson(Map<String, dynamic>.from(nested));
+      }
+      return ComplaintModel.fromJson(payload);
     }
-
-    final complaint = map['complaint'];
-    if (complaint is Map) {
-      return ComplaintModel.fromJson(Map<String, dynamic>.from(complaint));
-    }
-
-    if (map.containsKey('complaint_id') ||
-        map.containsKey('user_id') ||
-        map.containsKey('title')) {
-      return ComplaintModel.fromJson(map);
-    }
-
-    throw const FormatException(
-      'Expected complaint object under "data"/"complaint" or flat keys',
-    );
+    return ComplaintModel.fromJson(map);
   }
 }

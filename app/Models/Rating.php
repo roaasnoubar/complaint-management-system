@@ -7,30 +7,37 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Rating extends Model
 {
+    // التأكد من اسم الجدول الصحيح في قاعدة البيانات
+    protected $table = 'ratings';
+
     protected $fillable = [
-        'complaint_id',
+        'complain_id', // تأكدي أنها مكتوبة هكذا
         'user_id',
         'authority_id',
-        'stars',
+        'response_speed_score',
         'comment',
     ];
 
     protected $casts = [
-        'stars' => 'integer',
+        'response_speed_score' => 'integer',
+        'complaint_validity'   => 'boolean',
     ];
 
+    // العلاقة مع الشكوى
     public function complaint(): BelongsTo
     {
         return $this->belongsTo(Complaint::class);
     }
 
+    // المستخدم (صاحب الشكوى)
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
+    // الجهة المسؤولة (الموظف المُقيّم)
     public function authority(): BelongsTo
     {
-        return $this->belongsTo(Authority::class);
+        return $this->belongsTo(User::class, 'authority_id');
     }
 }

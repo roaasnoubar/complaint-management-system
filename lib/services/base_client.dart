@@ -1,62 +1,45 @@
 import 'package:dio/dio.dart';
 
+/// Shared API error mapping utilities.
+///
+/// Networking client is implemented in `DioClient`.
 class BaseClient {
-  BaseClient._();
-
-  static const String baseUrl = 'http://10.161.226.158:8000/api/';
-
-  static const Duration _timeout = Duration(seconds: 20);
-
-  static final Map<String, String> _defaultHeaders = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-  };
-
-  static final Dio dio = Dio(
-    BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: _timeout,
-      receiveTimeout: _timeout,
-      sendTimeout: _timeout,
-      headers: _defaultHeaders,
-    ),
-  );
-
   static String handleError(DioException error) {
-    if (error.response?.data != null && error.response?.data is Map) {
-      final data = error.response?.data as Map;
-      if (data.containsKey('message')) {
-        return data['message'].toString();
+    final data = error.response?.data;
+    if (data == null) return "فشل الاتصال بالسيرفر";
+
+    // Common Laravel formats:
+    // - { message: "...", errors: {...} }
+    // - { error: "..."}
+    // - "plain string"
+    // - HTML error page (string)
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      final msg = map['message'] ?? map['error'];
+      if (msg != null) return msg.toString();
+
+      // Try first validation error if present
+      final errors = map['errors'];
+      if (errors is Map) {
+        for (final entry in errors.entries) {
+          final v = entry.value;
+          if (v is List && v.isNotEmpty) return v.first.toString();
+          if (v != null) return v.toString();
+        }
       }
+      return "حدث خطأ غير متوقع";
     }
 
-    final status = error.response?.statusCode;
-    if (status != null) {
-      switch (status) {
-        case 401:
-          return 'غير مصرح - يرجى تسجيل الدخول';
-        case 404:
-          return 'الخدمة غير موجودة حالياً';
-        case 500:
-          return 'خطأ داخلي في السيرفر';
-        case 422:
-          return 'البيانات المدخلة غير صحيحة';
-        case 403:
-          return 'ليس لديك صلاحية للقيام بهذا الإجراء';
-        default:
-          return 'حدث خطأ (كود: $status)';
+    if (data is String) {
+      final trimmed = data.trim();
+      if (trimmed.isEmpty) return "حدث خطأ غير متوقع";
+      // Avoid dumping huge HTML into snackbar
+      if (trimmed.startsWith('<!DOCTYPE html') || trimmed.startsWith('<html')) {
+        return "حدث خطأ في السيرفر";
       }
+      return trimmed;
     }
 
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        return 'انتهت مهلة الاتصال، تحقق من الشبكة';
-      case DioExceptionType.connectionError:
-        return 'تعذر الاتصال بالخادم، تأكد من تشغيل السيرفر والـ IP';
-      default:
-        return 'حدث خطأ غير متوقع في الاتصال';
-    }
+    return "حدث خطأ غير متوقع";
   }
 }

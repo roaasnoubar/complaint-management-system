@@ -5,12 +5,17 @@ class MessageModel {
   final String message;
   final DateTime? sentAt;
 
+  final String senderType; // 'official' أو 'citizen'
+  final String? senderName;
+
   const MessageModel({
     this.id,
     required this.chatId,
     required this.senderId,
     required this.message,
     this.sentAt,
+    this.senderType = 'citizen',
+    this.senderName,
   });
 
   static DateTime? _readNullableDateTime(
@@ -20,25 +25,18 @@ class MessageModel {
     final value = json[key];
     if (value == null) return null;
     if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value);
     return DateTime.tryParse(value.toString());
   }
 
   static int _readInt(Map<String, dynamic> json, String key) {
     final value = json[key];
     if (value is int) return value;
-    if (value is String) {
-      final parsed = int.tryParse(value);
-      if (parsed != null) return parsed;
-    }
-    throw FormatException('Expected int for "$key", got: $value');
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 
   static String _readString(Map<String, dynamic> json, String key) {
-    final value = json[key];
-    if (value is String) return value;
-    if (value == null) return '';
-    return value.toString();
+    return json[key]?.toString() ?? '';
   }
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -48,6 +46,10 @@ class MessageModel {
       senderId: _readInt(json, 'sender_id'),
       message: _readString(json, 'message'),
       sentAt: _readNullableDateTime(json, 'sent_at'),
+      senderType: _readString(json, 'sender_type').isEmpty
+          ? 'citizen'
+          : _readString(json, 'sender_type'),
+      senderName: json['sender_name'],
     );
   }
 
@@ -57,5 +59,7 @@ class MessageModel {
     'sender_id': senderId,
     'message': message,
     'sent_at': sentAt?.toIso8601String(),
+    'sender_type': senderType,
+    'sender_name': senderName,
   };
 }
