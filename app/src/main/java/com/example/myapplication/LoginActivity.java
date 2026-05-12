@@ -1,5 +1,4 @@
-package com.example.myapplication; // تأكدي أن هذا السطر يطابق اسم حزمتك
-
+package com.example.myapplication;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -19,7 +18,6 @@ import java.util.Map;
 
 public class LoginActivity extends AppCompatActivity {
 
-    // 1. تعريف الرابط (الـ IP الحقيقي لجهازك والمنفذ 8000)
     private static final String LOGIN_URL = "http://192.168.43.x:8000/api/login";
 
     private EditText etUsername, etPassword;
@@ -29,15 +27,13 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_login); // تأكدي أن اسم ملف الـ XML هو activity_login
+        setContentView(R.layout.activity_login); 
 
-        // 2. ربط العناصر البرمجية بالـ IDs الموجودة في الـ XML
         etUsername = findViewById(R.id.etUsername);
         etPassword = findViewById(R.id.etPassword);
         btnLogin = findViewById(R.id.btnLogin);
         tvGoToRegister = findViewById(R.id.tvGoToRegister);
 
-        // 3. مستمع حدث الضغط على زر "دخول"
         btnLogin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -52,40 +48,35 @@ public class LoginActivity extends AppCompatActivity {
             }
         });
 
-        // مستمع الانتقال لواجهة التسجيل (اختياري)
         tvGoToRegister.setOnClickListener(v -> {
-            // هنا يمكنك إضافة Intent للانتقال لصفحة التسجيل
+
             Toast.makeText(this, "الانتقال لصفحة التسجيل...", Toast.LENGTH_SHORT).show();
         });
     }
 
-    // 4. دالة إرسال الطلب إلى سيرفر Laravel عبر Volley
+    // 4.  إرسال الطلب إلى سيرفر Volley
     private void loginUser(String email, String password) {
         StringRequest stringRequest = new StringRequest(Request.Method.POST, LOGIN_URL,
             response -> {
-                // في حال نجاح الاتصال وتلقي رد من السيرفر
+
                 Log.d("Laravel_Response", response);
                 Toast.makeText(LoginActivity.this, "تم تسجيل الدخول بنجاح!", Toast.LENGTH_LONG).show();
-                // هنا يمكنك الانتقال للشاشة الرئيسية بعد النجاح
+
             },
             error -> {
-                // في حال فشل الاتصال (Timeout أو خطأ 404/500)
                 Log.e("Laravel_Error", error.toString());
                 Toast.makeText(LoginActivity.this, "فشل الاتصال: تأكدي من السيرفر والشبكة", Toast.LENGTH_LONG).show();
             }) {
 
             @Override
             protected Map<String, String> getParams() {
-                // إرسال البيانات كـ POST Parameters
                 Map<String, String> params = new HashMap<>();
-                // تأكدي أن المفتاتيح (email, password) تطابق ما هو موجود في Laravel Controller
                 params.put("email", email);
                 params.put("password", password);
                 return params;
             }
         };
 
-        // إضافة الطلب إلى طابور Volley للتنفيذ
         Volley.newRequestQueue(this).add(stringRequest);
     }
 }
