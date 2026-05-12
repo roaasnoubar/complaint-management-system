@@ -16,7 +16,6 @@ public class RegisterActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
-        // ربط العناصر البرمجية بالـ XML
         etName = findViewById(R.id.etName);
         etPhone = findViewById(R.id.etPhone);
         etEmail = findViewById(R.id.etEmail);
@@ -32,7 +31,6 @@ public class RegisterActivity extends AppCompatActivity {
             if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
                 Toast.makeText(this, "يرجى تعبئة كافة الحقول", Toast.LENGTH_SHORT).show();
             } else {
-                // هنا سيتم لاحقاً استدعاء دالة Retrofit لإرسال البيانات
                 Toast.makeText(this, "جاري التسجيل...", Toast.LENGTH_SHORT).show();
                 performRegistration(name, phone, email, password);
             }
@@ -40,6 +38,5 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     private void performRegistration(String name, String phone, String email, String password) {
-        // سيتم وضع منطق الاتصال بالسيرفر هنا
     }
 }
