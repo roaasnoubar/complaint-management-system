@@ -54,7 +54,7 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
-    // 4.  إرسال الطلب إلى سيرفر Volley
+    //   إرسال الطلب إلى سيرفر Volley
     private void loginUser(String email, String password) {
         StringRequest stringRequest = new StringRequest(Request.Method.POST, LOGIN_URL,
             response -> {
