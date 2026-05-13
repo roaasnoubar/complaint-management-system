@@ -32,6 +32,7 @@ class Complain extends Model
         'resolved_at',
         'notes',
         'admin_reply',
+        'processed_by',
     ];
 
     // إضافة الحقول الوهمية للـ JSON لسهولة التعامل مع الأندرويد
@@ -183,4 +184,9 @@ class Complain extends Model
     {
         return $date->format('Y-m-d H:i:s');
     }
+    public function processor()
+{
+    // ربط الشكوى بالمستخدم الذي قام بالرد
+    return $this->belongsTo(User::class, 'processed_by');
+}
 }

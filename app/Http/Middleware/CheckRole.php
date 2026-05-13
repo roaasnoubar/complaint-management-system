@@ -18,31 +18,36 @@ class CheckRole
     }
 
     // جلب اسم الدور ومستواه من قاعدة البيانات
-    $userRoleName = strtolower($user->role->name);
-    $userLevel = intval($user->role->level);
+   // جلب البيانات من علاقة الدور (تأكدي أن المسميات تطابق الـ Response)
+$userRoleName = strtolower($user->role->name); // ستكون manager
+$userLevel = intval($user->role->level);      // ستكون 1
 
-    foreach ($roles as $role) {
-        // الفحص بناءً على الاسم (الموجود في قاعدة بياناتك)
-        if ($userRoleName === strtolower($role)) {
-            return $next($request);
-        }
-    
-        // الفحص بناءً على المستوى (لضمان المرونة في مشروع التخرج)
-        if ($role === 'admin' && $userLevel === 0) return $next($request);
-        if ($role === 'authority_manager' && $userLevel === 1) return $next($request);
-        if ($role === 'dept_manager' && $userLevel === 2) return $next($request);
-        if ($role === 'employee' && $userLevel === 3) return $next($request);
+foreach ($roles as $role) {
+    $roleLower = strtolower($role);
+
+    // 1. الفحص بالاسم (هذا ما يجب أن ينجح لـ manager)
+    if ($userRoleName === $roleLower) {
+        return $next($request);
     }
 
+    // 2. الفحص بالمستوى (للتأكيد الإضافي)
+    if ($roleLower === 'admin' && $userLevel === 0) return $next($request);
+    if ($roleLower === 'manager' && $userLevel === 1) return $next($request); // تأكدي أنها manager هنا
+    if ($roleLower === 'authority_manager' && $userLevel === 1) return $next($request);
+    if ($roleLower === 'dept_manager' && $userLevel === 2) return $next($request);
+    if ($roleLower === 'employee' && $userLevel === 3) return $next($request);
+}
     // في حال فشل كل الشروط، ستظهر لكِ هذه الرسالة مع تفاصيل "لماذا فشل"
-    return response()->json([
-        'success' => false,
-        'message' => 'Unauthorized access.',
-        'debug_info' => [
-            'your_role_in_db' => $userRoleName,
-            'your_level_in_db' => $userLevel,
-            'required_roles' => $roles
-        ]
-    ], 403);
+   // استبدلي آخر رسالة خطأ في ملف CheckRole بهذا:
+return response()->json([
+    'success' => false,
+    'message' => 'Unauthorized access.',
+    'debug' => [
+        'user_id' => $user->id,
+        'user_role_name_in_db' => $userRoleName,
+        'user_level_in_db' => $userLevel,
+        'roles_required_by_route' => $roles
+    ]
+], 403);
 }
 }

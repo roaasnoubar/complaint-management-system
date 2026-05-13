@@ -67,30 +67,44 @@ $employee = $request->user();
      * 2. عرض تفاصيل شكوى محددة (Show)
      */
     public function getComplaint(Request $request, $id): JsonResponse
-    {
-        $employee = $request->user();
+{
+    $user = $request->user();
+    
+    // التأكد من جلب الشكوى مع كافة العلاقات المطلوبة
+    $complain = Complain::with(['user', 'authority', 'department', 'attachments', 'chat.messages.sender'])
+                        ->findOrFail($id);
 
-        $complain = Complain::with(['user', 'authority', 'department', 'attachments', 'chat.messages.sender'])
-                            ->findOrFail($id);
+    // الوصول للمستوى بشكل آمن (تأكدي أن علاقة role معرفة في موديل User)
+    $userLevel = $user->role ? intval($user->role->level) : null;
 
-        if ($employee->isEmployee()) {
-            // استخدام != للمقارنة المرنة
-            if ($complain->authority_id != $employee->authority_id || 
-                $complain->department_id != $employee->department_id) {
-                
-                return response()->json([
-                    'success' => false, 
-                    'message' => 'Access Denied. This complaint belongs to another department.'
-                ], 403);
-            }
+    // 1. منطق مدير الجهة (Level 1)
+    if ($userLevel === 1) {
+        // المدير يتبع لجهة معينة ويجب أن يرى كل ما يخص هذه الجهة (authority_id)
+        // نستخدم == للمقارنة المرنة لتجنب مشاكل أنواع البيانات (String vs Integer)
+        if ($complain->authority_id != $user->authority_id) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Access Denied: You do not belong to this Authority.'
+            ], 403);
         }
-
-        return response()->json([
-            'success' => true, 
-            'data' => $this->formatComplainResponse($complain, true)
-        ], 200);
+    } 
+    // 2. منطق الموظف أو مدير القسم (Levels 2, 3)
+    else {
+        // الموظف مقيد بالجهة والقسم معاً
+        if ($complain->authority_id != $user->authority_id || $complain->department_id != $user->department_id) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Access Denied: Department Mismatch.'
+            ], 403);
+        }
     }
 
+    // إذا اجتاز التحقق، يتم إرجاع البيانات
+    return response()->json([
+        'success' => true, 
+        'data' => $this->formatComplainResponse($complain, true)
+    ], 200);
+}
     /**
      * 3. دالة التنسيق الموحدة
      */

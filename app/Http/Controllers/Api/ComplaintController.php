@@ -488,41 +488,62 @@ public function getComplaintsByStatus(Request $request, $status): JsonResponse
  */
 public function respond(Request $request, $id) 
 {
-    // 1. التحقق من المدخلات (النص، وحالة الشكوى، وصحة الشكوى للنقاط)
+    $complaint = \App\Models\Complain::findOrFail($id);
+    $admin = $request->user();
+
+    // القفل الإداري الصارم
+    $adminLevel = (int)$admin->role->level; // المستوى من جدول الأدوار
+    $complaintLevel = (int)$complaint->assigned_level; // مستوى الشكوى الحالي
+
+    // إذا كان مستوى الشخص (2) أكبر من مستوى الشكوى (1) -> ارفض
+    if ($adminLevel > $complaintLevel) {
+        return response()->json([
+            'success' => false,
+            'message' => 'عذراً، هذه الشكوى أصبحت من صلاحية الإدارة العليا (مدير الجامعة).'
+        ], 403);
+    }
+
+    // شرط إضافي: إذا كانت الشكوى لمدير الجامعة (1) والمستخدم ليس أدمن (0) ولا مدير عام (1)
+    if ($complaintLevel === 1 && $adminLevel > 1) {
+        return response()->json([
+            'success' => false,
+            'message' => 'صلاحياتك لا تسمح بالرد على شكاوى مستوى مدير الجامعة.'
+        ], 403);
+    }
+
+    // بقية الكود كما هو...
     $request->validate([
         'reply' => 'required|string|min:5|max:1000',
         'status' => 'required|in:Resolved,Rejected',
-        'is_valid' => 'required|boolean'// الموظف يحدد إذا كانت الشكوى صادقة أم كاذبة
+        'is_valid' => 'required|boolean'
     ]);
 
-    // 2. جلب الشكوى مع المستخدم صاحب الشكوى
-    $complaint = \App\Models\Complain::findOrFail($id);
-    $citizen = $complaint->user;
-
-    // 3. تحديث بيانات الشكوى بحقل الرد الجديد
     $complaint->update([
         'status' => $request->status,
         'admin_reply' => $request->reply, 
-        'resolved_at' => now()
+        'resolved_at' => now(),
+        'processed_by' => $admin->id 
     ]);
-
-    // 4. تحديث نقاط المواطن (باستخدام الدالة الموجودة في موديل User عندك)
-    // تذكري: إذا كانت صادقة تزيد 10 نقاط، وإذا كاذبة تنقص 20
+    
+    // ... باقي كود الإشعارات والنقاط ..
+        // 5. تحميل العلاقات وإرسال الإشعارات
+    $complaint->load('processor.role');
+    $citizen = $complaint->user;
     $citizen->adjustScoreByValidity($request->is_valid);
 
-    // 5. إرسال الإشعار وبثه لحظياً (Event Broadcasting)
-    // هذه الدالة ستستدعي Event NotificationSent الذي أرسلتِ كوده
     $title = ($request->status == 'Resolved') ? 'تمت معالجة شكواك' : 'تحديث بشأن شكواك';
-    $citizen->sendNotification(
-        $title,
-        $request->reply,
-        'COMPLAINT_ACTION',
-        ['complaint_id' => $complaint->id]
-    );
+    $citizen->sendNotification($title, $request->reply, 'COMPLAINT_ACTION', ['complaint_id' => $complaint->id]);
 
     return response()->json([
         'success' => true,
-        'message' => 'تم حفظ الرد، تحديث النقاط، وإرسال الإشعار بنجاح'
+        'message' => 'تم حفظ الرد بنجاح',
+        'data' => [
+            'resolved_at' => $complaint->resolved_at->format('Y-m-d H:i:s'),
+            'handler_info' => [
+                'name' => $complaint->processor->name ?? 'غير محدد',
+                'role' => $complaint->processor->role->name ?? 'موظف'
+            ]
+        ]
     ]);
 }
 }

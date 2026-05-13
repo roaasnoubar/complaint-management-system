@@ -140,16 +140,17 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/complaints', [ComplaintController::class, 'index']); 
         Route::get('/complaints/{id}', [ComplaintController::class, 'show']);
     });
-    // --- 3. نظام الشكاوى (الموظف) ---
-    Route::prefix('employee')->middleware(['auth:sanctum', 'role:employee,dept_manager,authority_manager,admin'])->group(function () {
-        Route::get('/list', [EmployeeComplaintController::class, 'getComplaints'])->name('employee.complaints.list');
-        Route::get('/view/{id}', [EmployeeComplaintController::class, 'getComplaint'])->name('employee.complaints.view');
-        Route::apiResource('manage-complaints', ComplaintController::class)
-              ->names('employee.manage.complaints')
-              ->only(['index', 'show']);
-        Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
-
-    });
+    // --- 3. نظام الشكاوى (الموظف) ---Route::middleware(['auth:sanctum'])->group(function () {
+    
+    // أضيفي auth:sanctum قبل role لضمان التعرف على المستخدم
+Route::prefix('employee')->middleware(['auth:sanctum', 'role:manager,admin,dept_manager,employee'])->group(function () {
+    Route::get('/list', [EmployeeComplaintController::class, 'getComplaints'])->name('employee.complaints.list');
+    Route::get('/view/{id}', [EmployeeComplaintController::class, 'getComplaint'])->name('employee.complaints.view');
+    Route::apiResource('manage-complaints', ComplaintController::class)
+          ->names('employee.manage.complaints')
+          ->only(['index', 'show']);
+    Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
+});
 
     // --- 4. نظام الشكاوى (المستخدم العادي) ---
     Route::get('/departments', [DepartmentController::class, 'index']); 
