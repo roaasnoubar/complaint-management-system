@@ -18,7 +18,6 @@ public class ComplaintReplyActivity extends AppCompatActivity {
 
         boxOfficialReply = findViewById(R.id.boxOfficialReply);
 
-        // عند الضغط على بوكس الرد الرسمي يفتح صفحة بيضاء للكتابة
         boxOfficialReply.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

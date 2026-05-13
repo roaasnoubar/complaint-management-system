@@ -1,5 +1,4 @@
 package com.example.myapplication.employee;
-
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
@@ -23,7 +22,6 @@ public class ComplaintListActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // جعل شريط الحالة أبيض والأيقونات سوداء
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(Color.WHITE);
@@ -31,7 +29,6 @@ public class ComplaintListActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_complaint_list);
 
-        // إزالة الرمادي نهائياً وجعل الخلفية بيضاء سادة تماماً
         getWindow().getDecorView().setBackgroundColor(Color.WHITE);
         View rootView = findViewById(android.R.id.content);
         if (rootView != null) {

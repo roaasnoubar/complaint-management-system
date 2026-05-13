@@ -17,7 +17,6 @@ public class FullScreenReplyActivity extends AppCompatActivity {
         btnDone.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // هنا نغلق الصفحة ونعود للواجهة السابقة
                 finish();
             }
         });

@@ -13,24 +13,20 @@ public class EmpDashboardActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_emp_dashboard);
 
-        // ربط الكروت الموجودة في واجهة الموظف
-        CardView cardOpen = findViewById(R.id.card_open);           // الشكاوى الجديدة
-        CardView cardProcessing = findViewById(R.id.card_processing); // قيد المعالجة
-        CardView cardClosed = findViewById(R.id.card_closed);       // الشكاوى المغلقة
+        CardView cardOpen = findViewById(R.id.card_open);           
+        CardView cardProcessing = findViewById(R.id.card_processing); 
+        CardView cardClosed = findViewById(R.id.card_closed);       
 
-        // عند الضغط على الشكاوى الجديدة
         cardOpen.setOnClickListener(v -> navigateToList("NEW"));
 
-        // عند الضغط على قيد المعالجة / المراجعة
         cardProcessing.setOnClickListener(v -> navigateToList("PROCESS"));
 
-        // عند الضغط على الشكاوى المغلقة / تم الحل
         cardClosed.setOnClickListener(v -> navigateToList("CLOSED"));
     }
 
     private void navigateToList(String type) {
         Intent intent = new Intent(EmpDashboardActivity.this, ComplaintListActivity.class);
-        intent.putExtra("COMPLAINT_TYPE", type); // نرسل النوع المختار
+        intent.putExtra("COMPLAINT_TYPE", type); 
         startActivity(intent);
     }
 }
