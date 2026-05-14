@@ -26,7 +26,7 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.View
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // يتم استخدام item_complaint الذي يحتوي على خلفية بيضاء
+
         View view = LayoutInflater.from(context).inflate(R.layout.item_complaint, parent, false);
         return new ViewHolder(view);
     }
@@ -42,29 +42,27 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.View
 
         String status = complaint.getStatus();
 
-        // إعداد ألوان الحالة (نصوص ملونة بخلفيات فاتحة جداً بدلاً من الرمادي)
         if (status.equals("قيد الانتظار")) {
-            holder.tvStatus.setTextColor(Color.parseColor("#E65100")); // برتقالي
+            holder.tvStatus.setTextColor(Color.parseColor("#E65100")); 
             holder.tvStatus.setBackgroundColor(Color.parseColor("#FFF3E0"));
-            holder.btnReply.setVisibility(View.GONE); // إخفاء الزر
+            holder.btnReply.setVisibility(View.GONE); 
         }
         else if (status.equals("قيد المعالجة") || status.equals("قيد المراجعة")) {
-            holder.tvStatus.setTextColor(Color.parseColor("#006064")); // تركواز
+            holder.tvStatus.setTextColor(Color.parseColor("#006064")); 
             holder.tvStatus.setBackgroundColor(Color.parseColor("#E0F2F1"));
 
-            // إظهار زر الرد فقط في هذه الحالة
             holder.btnReply.setVisibility(View.VISIBLE);
             holder.btnReply.setOnClickListener(v -> {
-                // التعديل المطلوب: الانتقال مباشرة إلى الواجهة البيضاء السادة
+
                 Intent intent = new Intent(context, FullScreenReplyActivity.class);
                 intent.putExtra("complaint_id", complaint.getId());
                 context.startActivity(intent);
             });
         }
         else if (status.equals("تم الحل")) {
-            holder.tvStatus.setTextColor(Color.parseColor("#2E7D32")); // أخضر
+            holder.tvStatus.setTextColor(Color.parseColor("#2E7D32")); 
             holder.tvStatus.setBackgroundColor(Color.parseColor("#E8F5E9"));
-            holder.btnReply.setVisibility(View.GONE); // إخفاء الزر
+            holder.btnReply.setVisibility(View.GONE); 
         }
     }
 
@@ -79,7 +77,6 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.View
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            // ربط العناصر من ملف item_complaint.xml
             tvTitle = itemView.findViewById(R.id.textViewTitle);
             tvStatus = itemView.findViewById(R.id.textViewStatus);
             tvUser = itemView.findViewById(R.id.textViewUser);

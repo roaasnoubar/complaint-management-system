@@ -9,12 +9,10 @@ public class Complaint {private String id;
     private String sender;
     private ArrayList<String> attachments;
 
-    // 1. منشئ فارغ (ضروري لبعض العمليات)
     public Complaint() {
         this.attachments = new ArrayList<>();
     }
 
-    // 2. منشئ يستقبل 6 متغيرات (الذي كان لديكِ سابقاً)
     public Complaint(String id, String title, String status, String description, String sender, ArrayList<String> attachments) {
         this.id = id;
         this.title = title;
@@ -24,15 +22,13 @@ public class Complaint {private String id;
         this.attachments = attachments;
     }
 
-    // 3. المنشئ الجديد (المطلوب لحل المشكلة)
-    // هذا المنشئ يسمح لكِ بإضافة شكوى بـ 4 نصوص فقط كما تفعلين في الـ Activity
     public Complaint(String id, String title, String status, String sender) {
         this.id = id;
         this.title = title;
         this.status = status;
         this.sender = sender;
-        this.description = ""; // قيمة افتراضية
-        this.attachments = new ArrayList<>(); // قائمة فارغة افتراضية
+        this.description = ""; 
+        this.attachments = new ArrayList<>(); 
     }
 
     // Getters and Setters

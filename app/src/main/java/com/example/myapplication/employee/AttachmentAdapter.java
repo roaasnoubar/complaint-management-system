@@ -8,7 +8,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.myapplication.R;
 import java.util.ArrayList;
 
-// هذا السطر هو الأهم:
 public class AttachmentAdapter extends RecyclerView.Adapter<AttachmentAdapter.ViewHolder> {
 
     private ArrayList<String> data;
@@ -26,7 +25,6 @@ public class AttachmentAdapter extends RecyclerView.Adapter<AttachmentAdapter.Vi
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        // هنا ستعرضين البيانات لاحقاً
     }
 
     @Override
@@ -34,7 +32,6 @@ public class AttachmentAdapter extends RecyclerView.Adapter<AttachmentAdapter.Vi
         return data != null ? data.size() : 0;
     }
 
-    // تعريف الـ ViewHolder
     public static class ViewHolder extends RecyclerView.ViewHolder {
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
