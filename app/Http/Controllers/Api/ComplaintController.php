@@ -465,12 +465,18 @@ public function getComplaintsByStatus(Request $request, $status): JsonResponse
 
     // نظام الحماية (Security Gate): كل شخص يرى فقط ما يخصه
     if (!$user->isAdmin()) {
-        // نتحقق من المستوى: إذا كان المستوى 1 (مدير جامعة/جهة)
-        if ((int)$user->role->level === 1) {  // مدير الجهة يرى شكاوى جهته فقط
+        // جلب المستوى الإداري للمستخدم من علاقة الـ role
+        $userLevel = $user->role ? (int)$user->role->level : null;
+
+        if ($userLevel === 1) {
+            // مدير الجامعة/الجهة (Level 1): يرى كل شكاوى الأقسام التابعة لجامعته
             $query->where('authority_id', $user->authority_id);
-        } else {
-            // مدير القسم والموظف يريان شكاوى قسمهما فقط
+        } elseif ($userLevel === 2 || $userLevel === 3) {
+            // مدير القسم (Level 2) والموظف (Level 3): يريان شكاوى قسمهما المحدد فقط
             $query->where('department_id', $user->department_id);
+        } else {
+            // المواطن العادي أو الطالب: لا يرى إلا الشكاوى التي قدمها بنفسه
+            $query->where('user_id', $user->id);
         }
     }
 

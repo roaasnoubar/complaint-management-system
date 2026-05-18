@@ -15,7 +15,6 @@ use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ComplainChatController;
 use App\Models\Complain;
 use Carbon\Carbon;
-
 /*
 |--------------------------------------------------------------------------
 | Public Routes (المسارات العامة)
