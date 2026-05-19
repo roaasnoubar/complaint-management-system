@@ -36,14 +36,21 @@ Route::prefix('auth')->group(function () {
 });
 
 // انقليه إلى هنا (خارج الـ middleware) ليعمل في البوست مان بدون Token
+// -------------------------------------------------------------------------
+// مسار التصعيد التلقائي المطور (المصحح بالكامل بتوقيت دمشق وحالة Pending)
+// -------------------------------------------------------------------------
 Route::get('/escalate-complaints', function () {
-    // 1. استخدام الوقت المحلي (دمشق) بشكل صريح وموحد لكل العملية
-    $now = \Carbon\Carbon::now(); 
-    $delay = (clone $now)->subMinute(); // الشكاوى التي مر عليها دقيقة أو أكثر
+    // 1. تثبيت التوقيت الحالي لدمشق 
+    $now = Carbon::now('Asia/Damascus');
+    
+    // نطرح دقيقة واحدة وثانية إضافية لضمان تخطي أي حماية للوقت والتقاط الشكوى المنتهية فوراً
+    $delay = (clone $now)->subMinute()->addSeconds(5); 
 
     // 2. تصعيد إلى مدير الجهة (Level 1)
-    // نبدأ بالفلتر الأعلى (Level 2 -> 1) لضمان عدم تصعيد الشكوى مرتين في نفس الطلب
-    $toAuthority = \App\Models\Complain::where('assigned_level', 2)
+    // تم تصحيح علامة الدولار ($toAuthority بدلاً من $$toAuthority)
+    $toAuthority = Complain::where('status', 'Pending')
+        ->where('assigned_level', 2)
+        ->whereNull('processed_by')
         ->where('assigned_at', '<=', $delay)
         ->with('department')
         ->get();
@@ -51,12 +58,15 @@ Route::get('/escalate-complaints', function () {
     foreach ($toAuthority as $complaint) {
         $complaint->update([
             'assigned_level' => 1,
-            'assigned_at' => $now, // تحديث وقت التكليف الجديد بتوقيت دمشق
+            'assigned_at'    => $now, 
+            'updated_at'     => $now
         ]);
     }
 
     // 3. تصعيد إلى مدير القسم (Level 2)
-    $toManager = \App\Models\Complain::where('assigned_level', 3)
+    $toManager = Complain::where('status', 'Pending')
+        ->where('assigned_level', 3)
+        ->whereNull('processed_by')
         ->where('assigned_at', '<=', $delay)
         ->with('department')
         ->get();
@@ -64,7 +74,8 @@ Route::get('/escalate-complaints', function () {
     foreach ($toManager as $complaint) {
         $complaint->update([
             'assigned_level' => 2,
-            'assigned_at' => $now, // تحديث وقت التكليف الجديد بتوقيت دمشق
+            'assigned_at'    => $now, 
+            'updated_at'     => $now
         ]);
     }
 
@@ -101,7 +112,7 @@ Route::get('/escalate-complaints', function () {
     return response()->json([
         'status' => 'idle',
         'message' => 'النظام مستقر، لا توجد شكاوى تجاوزت المهلة (1 دقيقة)',
-        'current_time' => $now->format('Y-m-d H:i:s'),
+        'current_time_damascus' => $now->format('Y-m-d H:i:s'),
         'total_count' => 0
     ], 200);
 });
@@ -110,7 +121,7 @@ Route::get('/escalate-complaints', function () {
 | Protected Routes (Sanctum) - المسارات المحمية
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])->group(function () {
     
     // --- حساب المستخدم ---
     Route::prefix('auth')->group(function () {

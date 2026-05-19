@@ -1,10 +1,25 @@
 <?php
 
-use Illuminate\Support\Facades\Artisan;
-use App\Console\Commands\EscalateComplaints;
+use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Http;
 
-// هذا السطر سيجبر لارافيل على تسجيل الكلاس والأمر go
-Artisan::command('go', function () {
-    $command = new EscalateComplaints();
-    $command->handle();
-})->purpose('تصعيد الشكاوى آلياً');
+/*
+|--------------------------------------------------------------------------
+| Console Routes & Task Scheduling
+|--------------------------------------------------------------------------
+|
+| هذا الملف مسؤول عن جدولة المهام التلقائية في لارافيل.
+| قمنا ببرمجة السيرفر هنا ليزور رابط التصعيد الذكي الخاص بكِ كل دقيقة
+| ليتم فحص الوقت وتحديث جدول الشكاوى صامتاً خلف الكواليس.
+|
+*/
+
+// جدولة الاتصال التلقائي برابط التصعيد كل دقيقة بالثانية
+Schedule::call(function () {
+    try {
+        // السيرفر يقوم بطلب الرابط محلياً لتشغيل كود دمشق وحالة Pending
+        Http::get('http://127.0.0.1:8000/api/escalate-complaints');
+    } catch (\Exception $e) {
+        // تم وضع الـ catch فارغة لضمان عدم ظهور أخطاء بالتيرمنال في حال إعادة تشغيل السيرفر
+    }
+})->everyMinute();
