@@ -25,7 +25,7 @@ class ComplaintProcessingController extends \App\Http\Controllers\Controller
         return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
     }
 
-    // 2. التحقق من الهرمية (Hierarchy Check): 
+    // 2. التحقق من الهرمية 
     // منع المستويات الأقل (رقمياً أكبر مثل الموظف 3) من تعديل مستويات أعلى (رقمياً أصغر مثل المدير 1)
     if (!$user->isAdmin() && intval($complain->level) < intval($user->role->level)) {
         return response()->json([
