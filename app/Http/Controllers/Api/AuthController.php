@@ -126,7 +126,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => false,
             'message' => 'يرجى تفعيل الحساب أولاً عبر الكود المرسل لإيميلك.'
-        ], 403); // هذا هو الكود الذي ينتظره التيست (403)
+        ], 403); 
     }
 
     // 5. إنشاء التوكن في حال كان الحساب مفعلاً
