@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attachment;
 use App\Models\Complain; 
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse; // تغيير الرد ليتناسب مع API
+use Illuminate\Http\JsonResponse; 
 use Illuminate\Support\Facades\Storage;
 
 class AttachmentController extends Controller
