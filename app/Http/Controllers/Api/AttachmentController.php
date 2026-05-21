@@ -18,7 +18,7 @@ class AttachmentController extends Controller
     {
         $validated = $request->validate([
             'complain_id' => 'required|exists:complains,id', // تعديل اسم الجدول والعمود
-            'file' => 'required|file|max:20480', // رفعنا الحد لـ 20MB
+            'file' => 'required|file|max:20480', 
         ]);
 
         $file = $request->file('file');
