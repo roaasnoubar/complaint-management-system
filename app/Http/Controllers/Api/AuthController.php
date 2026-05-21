@@ -67,7 +67,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)
             ->where('verification_code', trim($request->code)) 
-            ->where('verification_expires_at', '>=', now()->subMinutes(2)) // أضفنا دقيقتين سماح
+            ->where('verification_expires_at', '>=', now()->subMinutes(2)) 
             ->first();
             
         if (!$user) {
