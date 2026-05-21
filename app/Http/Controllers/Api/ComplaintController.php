@@ -469,7 +469,7 @@ public function getComplaintsByStatus(Request $request, $status): JsonResponse
         $userLevel = $user->role ? (int)$user->role->level : null;
 
         if ($userLevel === 1) {
-            // مدير الجامعة/الجهة (Level 1): يرى كل شكاوى الأقسام التابعة لجامعته
+            // مدير الجامعة/الجهة (Level 1):رى كل شكاوى الأقسام التابعة لجامعته
             $query->where('authority_id', $user->authority_id);
         } elseif ($userLevel === 2 || $userLevel === 3) {
             // مدير القسم (Level 2) والموظف (Level 3): يريان شكاوى قسمهما المحدد فقط
