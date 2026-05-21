@@ -44,7 +44,7 @@ class UserManagementController extends Controller
             'phone'         => $validated['phone'] ?? null,
             'password'      => Hash::make($validated['password']),
             'role_id'       => $validated['role_id'],
-            'authority_id'  => $finalAuthorityId, // الربط المحمي
+            'authority_id'  => $finalAuthorityId, // لربط المحمي
             'department_id' => $validated['department_id'] ?? null,
             'is_active'     => true,
             'is_verified'   => true,
