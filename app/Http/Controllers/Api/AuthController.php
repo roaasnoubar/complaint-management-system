@@ -120,7 +120,6 @@ class AuthController extends Controller
     $user = Auth::user();
 
     if (!$user->is_verified) {
-        // تسجيل خروج المستخدم فوراً لأنه نجح في Attempt لكن حسابه غير مفعل
         Auth::logout(); 
         
         return response()->json([
