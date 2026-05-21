@@ -12,10 +12,10 @@ class ERDDatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            PermissionSeeder::class,
-            RoleSeeder::class,
-            AuthoritySeeder::class,
-            DepartmentSeeder::class,
+            PermissionSeeder::class, // 1. إنشاء الصلاحيات
+            RoleSeeder::class,       // 2. إنشاء الأدوار الثابتة (من 1 إلى 5)
+            AuthoritySeeder::class,  // 3. إنشاء الجهات وأقسامها (جامعة الشام، الوزارات...)
+            UserSeeder::class,       // 4. إنشاء الحسابات الثابتة والموظفين بناءً على الأقسام أعلاه
         ]);
     }
 }
