@@ -421,7 +421,7 @@ public function escalate(Request $request, $id)
 
     $targetLevel = $request->target_level;
 
-    // 3. منطق التصعيد المنطقي:
+  
     // لا يمكن للموظف تصعيد شكوى لمستوى أقل من مستواها الحالي
     if ($targetLevel >= $complaint->assigned_level && $user->role?->level != 0) {
         return response()->json([
