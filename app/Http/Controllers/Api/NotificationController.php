@@ -146,7 +146,7 @@ class NotificationController extends Controller
 {
     $notifications = Notification::where('user_id', auth()->id())
         ->latest()
-        ->take(5) // جلب آخر 5 إشعارات فقط
+        ->take(5) // جلب آخر 5 إشعاراتفقط
         ->get();
 
     return response()->json([
