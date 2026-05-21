@@ -51,7 +51,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * 3. الشكاوى حسب القسم (Departments)
+     * 3. الشكاوى حسب القسم 
      */
     public function complaintsByDepartment(): JsonResponse
     {
