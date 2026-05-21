@@ -70,7 +70,7 @@ class ComplainChatController extends Controller
     }
 
     /**
-     * إغلاق الدردشة (يمكن استدعاؤها عند حل الشكوى)
+     * إغلاق الدردشة (يمكن استدعاؤها  حل الشكوى)
      */
     public function close(ComplainChat $chat): JsonResponse
     {
