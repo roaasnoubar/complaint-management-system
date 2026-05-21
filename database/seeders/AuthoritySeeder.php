@@ -13,7 +13,6 @@ class AuthoritySeeder extends Seeder
      */
     public function run(): void
     {
-        // تعريف البيانات: جامعة الشام تحتوي على كل الأقسام، والوزارات تتبع اختصاصاتها
         $data = [
             'جامعة الشام الخاصة' => [
                 'دائرة الامتحانات',
