@@ -153,7 +153,7 @@ class ComplaintProcessingController extends \App\Http\Controllers\Controller
             'assigned_level' => $rejectionLevel, // تخزين المستوى الذي قام بالرفض بناءً على التوكين
         ]);
     
-        // 5. إرسال إشعار
+        // 5.  إشعار
         $this->sendStatusEmail($complain, 'Rejected');
     
         return response()->json([
