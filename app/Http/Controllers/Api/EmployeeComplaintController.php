@@ -64,7 +64,7 @@ $employee = $request->user();
     }
 
     /**
-     * 2. عرض تفاصيل شكوى محددة (Show)
+     * 2. عرض تفاصيل شكوى محددة 
      */
     public function getComplaint(Request $request, $id): JsonResponse
 {
