@@ -45,7 +45,6 @@ Route::get('/escalate-complaints', function () {
     // نطرح دقيقة واحدة وثانية إضافية لضمان تخطي أي حماية للوقت والتقاط الشكوى المنتهية فوراً
     $delay = (clone $now)->subMinute()->addSeconds(5); 
 
-    // تم تصحيح علامة الدولار ($toAuthority بدلاً من $$toAuthority)
     $toAuthority = Complain::where('status', 'Pending')
         ->where('assigned_level', 2)
         ->whereNull('processed_by')
