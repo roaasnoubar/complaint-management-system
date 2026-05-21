@@ -17,7 +17,7 @@ class AttachmentController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'complain_id' => 'required|exists:complains,id', // تعديل اسم الجدول والعمود
+            'complain_id' => 'required|exists:complains,id', 
             'file' => 'required|file|max:20480', 
         ]);
 
