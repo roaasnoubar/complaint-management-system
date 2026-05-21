@@ -68,7 +68,6 @@ class ChatController extends Controller
             return response()->json(['success' => false, 'message' => 'المحادثة مغلقة ولا يمكن الإرسال.'], 422);
         }
 
-        // ب. تطبيق منطق التصعيد والصلاحيات (5 أيام للموظف، 10 للمدير، ومفتوح لمدير الجهة)
         if (!$complain->canAccessChat($user)) {
             return response()->json([
                 'success' => false, 
@@ -134,7 +133,7 @@ public function getAllChats(Request $request): JsonResponse
     return response()->json(['success' => true, 'data' => $chats], 200);
 }
 
-// فتح محادثة (للموظف)
+
 public function openChat(Request $request, $complainId)
 {
     $user = auth()->user();
