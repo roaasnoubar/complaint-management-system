@@ -112,7 +112,7 @@ class ComplaintProcessingController extends \App\Http\Controllers\Controller
         // 1. تحديد مستوى الرفض والاسم بناءً على دور المستخدم (Role) من التوكين
         // نفترض أن الأدوار هي: employee, dept_manager, auth_manager
         $rejectionLevel = match(true) {
-            $user->isEmployee() => 3,         // موظف
+            $user->isEmployee() => 3,         
             $user->isDeptManager() => 2,      // مدير قسم
             $user->isAuthorityManager() => 1, // مدير جهة
             $user->isAdmin() => 1,            // الأدمن يعامل كأعلى مستوى
