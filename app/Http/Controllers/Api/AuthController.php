@@ -119,13 +119,15 @@ class AuthController extends Controller
     // 4. جلب المستخدم والتحقق من التفعيل (الإضافة هنا)
     $user = Auth::user();
 
-    if (!$user->is_verified) {
-        Auth::logout(); 
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'يرجى تفعيل الحساب أولاً عبر الكود المرسل لإيميلك.'
-        ], 403); 
+        // الفحص المعدّل: الطالب فقط (Role ID = 5) هو من يطالب بكود الـ OTP إذا كان حسابه غير مفعل
+        if ($user->role_id == 5 && !$user->is_verified) {
+            Auth::logout(); 
+            
+            return response()->json([
+                'success' => false,
+                'status' => 'verify_account', // نرسل الستيتوس للفلاتر ليعرف أنه يحتاج توجيه لشاشة الـ OTP
+                'message' => 'يرجى تفعيل الحساب أولاً عبر الكود المرسل لإيميلك.'
+            ], 403);
     }
 
     // 5. إنشاء التوكن في حال كان الحساب مفعلاً
