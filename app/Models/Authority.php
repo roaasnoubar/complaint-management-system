@@ -15,6 +15,8 @@ class Authority extends Model
         'name',
         'description',
         'is_active',
+        'total_ratings',
+        'average_rating',
     ];
 
     protected $casts = [
@@ -31,18 +33,18 @@ class Authority extends Model
         return $this->hasMany(Complain::class, 'auth_id');
     }
 
-    public function rattings(): HasMany
+    public function ratings(): HasMany
     {
-        return $this->hasMany(Ratting::class);
+        return $this->hasMany(Rating::class, 'authority_id');
     }
 
     public function getAverageRatingAttribute(): float
     {
-        return round($this->rattings()->avg('response_speed_score') ?? 0, 1);
+        return round($this->ratings()->avg('response_speed_score') ?? 0.0, 1);
     }
 
     public function getTotalRatingsAttribute(): int
     {
-        return $this->rattings()->count();
+        return $this->ratings()->count();
     }
 }

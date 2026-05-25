@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ComplainChatController;
+use App\Http\Controllers\Api\RatingController;
 use App\Models\Complain;
 use Carbon\Carbon;
 /*
@@ -211,4 +212,13 @@ Route::middleware(['auth:sanctum', 'role:admin,authority_manager,dept_manager,em
     Route::post('/complaints/{id}/status', [ComplaintProcessingController::class, 'updateStatus']);
     Route::post('/complaints/{id}/reject', [ComplaintProcessingController::class, 'reject']);
 });
+Route::middleware('auth:sanctum')->group(function () {
+    
+    // رابط إرسال التقييم من الموبايل (تمرير معرف الشكوى في الرابط)
+    Route::post('/complains/{id}/rate', [RatingController::class, 'submitRating']);
+    
+});
+
+// رابط جلب تقييمات وتوزيع نجوم جهة معينة للـ Dashboard (متاح للجميع أو حسب الصلاحيات)
+Route::get('/authorities/{id}/ratings', [RatingController::class, 'getAuthorityRatings']);
 });

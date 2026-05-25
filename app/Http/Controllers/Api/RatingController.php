@@ -3,76 +3,127 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Rating;
-use App\Models\Complaint;
-use Illuminate\Http\JsonResponse;
+use App\Models\Rating; // تم التوحيد بحرف t واحد ليطابق الموديل تماماً
+use App\Models\Complain;
+use App\Models\Authority;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class RatingController extends Controller
 {
     /**
-     * تخزين التقييم وتحديث سكور المستخدم
+     * إرسال تقييم الطالب للجهة بعد حل الشكوى (متوافق مع حقول جدول ratings وتطبيق الفلاتر)
      */
-    public function store(Request $request): JsonResponse
-{
-    try {
-        $validated = $request->validate([
-            'complain_id'        => 'required|exists:complains,id', 
-            'complaint_validity' => 'required|boolean',
-            'comment'            => 'nullable|string',
+   /**
+     * إرسال تقييم الطالب للجهة بعد حل الشكوى (نسخة متوافقة بدون تعديل حقول جدول authorities)
+     */
+    public function submitRating(Request $request, $complainId): JsonResponse
+    {
+        // 1. جلب الشكوى للتأكد من وجودها في قاعدة البيانات
+        $complain = Complain::findOrFail($complainId);
+
+        // 2. درع أمان: التأكد أن الطالب الذي يقيم هو نفسه صاحب الشكوى الموثق بالسيرفر
+        if (intval($complain->user_id) !== intval($request->user()->id)) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'عذراً، لا تملك الصلاحية البرمجية لتقييم هذه الشكوى.'
+            ], 403);
+        }
+
+        // 3. شرط منطقي: لا يمكن التقييم إلا إذا كانت الشكوى مغلقة ومحلولة بنجاح
+        if ($complain->status !== Complain::STATUS_RESOLVED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'يمكنك فقط تقييم الشكاوى بعد أن يتم حلها وإغلاقها بنجاح.',
+                'data'    => ['current_status' => $complain->status],
+            ], 422);
+        }
+
+        // 4. منع التكرار العشوائي: التأكد أن الطالب لم يقم بتقييم هذه الشكوى مسبقاً
+        $existingRating = Rating::where('complain_id', $complainId)
+                                 ->where('user_id', $request->user()->id)
+                                 ->first();
+
+        if ($existingRating) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لقد قمت بتقييم هذه الشكوى سابقاً، لا يمكن تكرار العملية.',
+                'data'    => $existingRating,
+            ], 422);
+        }
+
+        // 5. التحقق من صحة المدخلات القادمة من تطبيق الموبايل (النجوم والتعليق)
+        $request->validate([
+            'response_speed_score' => 'required|integer|min:1|max:5',
+            'comment'              => 'nullable|string|max:500',
         ]);
 
-        return DB::transaction(function () use ($validated) {
-            $complaint = DB::table('complains')->where('id', $validated['complain_id'])->first();
-            $userId = $complaint->user_id;
+        // استخدام الـ Database Transaction لضمان الحفظ المترابط والأمان العالي
+        return DB::transaction(function () use ($request, $complain, $complainId) {
+            
+            // تحديد الحقل البرمجي للجهة
+            $authorityId = $complain->authority_id ?? $complain->auth_id;
 
-            // --- الخطوة السحرية: حذف التقييم القديم إن وجد لفتح الطريق تلقائياً ---
-            DB::table('ratings')
-                ->where('complain_id', $validated['complain_id'])
-                ->where('user_id', $userId)
-                ->delete();
-
-            // الآن نقوم بالإدخال بدون خوف من خطأ الـ Duplicate
-            DB::table('ratings')->insert([
-                'complain_id'        => $validated['complain_id'],
-                'user_id'            => $userId,
-                'authority_id'       => auth()->id() ?? 3,
-                'complaint_validity' => $validated['complaint_validity'],
-                'comment'            => $validated['comment'],
-                'created_at'         => now(),
-                'updated_at'         => now(),
+            // 6. إدخال التقييم رسمياً في جدول rattings
+            $rating = Rating::create([
+                'complain_id'          => $complainId,
+                'user_id'              => $request->user()->id,
+                'authority_id'         => $authorityId,
+                'response_speed_score' => $request->response_speed_score,
+                'comment'              => $request->comment,
             ]);
 
-            // منطق الخصم
-            if ($validated['complaint_validity'] == false) {
-                $user = DB::table('users')->where('id', $userId)->first();
-                
-                $newFakeCount = ($user->fake_complaints_count ?? 0) + 1;
-                $newScore = max(0, ($user->score ?? 100) - 20);
+            // جلب الجهة لحساب المعدلات ديناميكياً بدون التحديث المباشر للجدول
+            $authority = Authority::find($authorityId);
 
-                DB::table('users')->where('id', $userId)->update([
-                    'fake_complaints_count' => $newFakeCount,
-                    'score'                 => $newScore,
-                    'is_banned'             => ($newFakeCount >= 3)
-                ]);
-
-                $message = "تم التقييم بنجاح. رصيد المستخدم الحالي: $newScore";
-            } else {
-                $message = "تم تسجيل التقييم كشكوى صادقة.";
-            }
-
-            return response()->json(['success' => true, 'message' => $message], 201);
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تسجيل تقييمك لسرعة استجابة الموظفين بنجاح. شكراً لك.',
+                'data'    => [
+                    'rating'    => $rating,
+                    'authority' => $authority ? [
+                        'id'             => $authority->id,
+                        'name'           => $authority->name,
+                        'average_rating' => $authority->average_rating, // سيحسبها لارافيل تلقائياً
+                        'total_ratings'  => $authority->total_ratings,  // سيحسبها لارافيل تلقائياً
+                    ] : null,
+                ],
+            ], 201);
         });
-    } catch (\Exception $e) {
-        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
     }
-}
-    public function show(int $id): JsonResponse
+
+    /**
+     * جلب إحصائيات تقييمات جهة معينة وتوزيع النجوم (5 نجوم، 4 نجوم...) للـ Dashboard والويب
+     */
+    public function getAuthorityRatings($authorityId): JsonResponse
     {
-        // استخدمي العلاقة 'complaint' كما عرفناها في الموديل
-        $rating = Rating::with(['complaint', 'user'])->findOrFail($id);
-        return response()->json(['success' => true, 'data' => $rating]);
+        $authority = Authority::findOrFail($authorityId);
+
+        // جلب التقييمات مرتبة من الأحدث للأقدم مع بيانات الطالب والشكوى المرتبطة بها (Pagination)
+        $ratings = Rating::with(['user', 'complain'])
+                           ->where('authority_id', $authorityId)
+                           ->latest()
+                           ->paginate(10);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'authority' => [
+                    'id'              => $authority->id,
+                    'name'            => $authority->name,
+                    'average_rating'  => $authority->average_rating ?? 0.0,
+                    'total_ratings'   => $authority->total_ratings ?? 0,
+                    'score_breakdown' => [
+                        '5_stars' => Rating::where('authority_id', $authorityId)->where('response_speed_score', 5)->count(),
+                        '4_stars' => Rating::where('authority_id', $authorityId)->where('response_speed_score', 4)->count(),
+                        '3_stars' => Rating::where('authority_id', $authorityId)->where('response_speed_score', 3)->count(),
+                        '2_stars' => Rating::where('authority_id', $authorityId)->where('response_speed_score', 2)->count(),
+                        '1_star'  => Rating::where('authority_id', $authorityId)->where('response_speed_score', 1)->count(),
+                    ],
+                ],
+                'ratings' => $ratings,
+            ],
+        ], 200);
     }
 }

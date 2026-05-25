@@ -10,88 +10,106 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
-class ComplaintProcessingController extends \App\Http\Controllers\Controller
+
+class ComplaintProcessingController extends Controller
 {
     /**
      * تحديث حالة الشكوى (استلام، حل) مع تحديث نقاط المصداقية وتوقيت التعيين.
      */
+    public function acceptAsValid($id): JsonResponse
+    {
+        $complaint = Complain::findOrFail($id);
+        
+        // تحديث حالة الشكوى وتوثيق وقت الحل لمنع المشاكل الإحصائية
+        $complaint->update([
+            'status' => Complain::STATUS_RESOLVED,
+            'resolved_at' => now(),
+        ]);
+
+        // جلب الطالب صاحب الشكوى عبر العلاقة المحددة في الموديل
+        $student = $complaint->user; 
+        
+        if ($student) {
+            // رفع السكور الخاص بالطالب بمقدار 10 نقاط كمكافأة على جديته
+            $student->increment('score', 10); 
+        }
+
+        // إرسال إشعار عبر الإيميل بالطريقة النظامية
+        $this->sendStatusEmail($complaint, Complain::STATUS_RESOLVED);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم قبول الشكوى كشكوى صحيحة، وتحديث الحالة، ورفع سكور الطالب بنجاح.',
+            'data' => [
+                'id' => $complaint->id,
+                'current_status' => $complaint->status,
+                'user_new_score' => $student ? $student->score : 0
+            ]
+        ], 200);
+    }
+        
     public function updateStatus(Request $request, $id): JsonResponse
-{
-    $user     = $request->user();
-    $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
+    {
+        $user     = $request->user();
+        $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
 
-    // 1. التحقق من الصلاحيات العامة (هل هو موظف، مدير، أو أدمن؟)
-    if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
-        return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
-    }
-
-    // 2. التحقق من الهرمية 
-    // منع المستويات الأقل (رقمياً أكبر مثل الموظف 3) من تعديل مستويات أعلى (رقمياً أصغر مثل المدير 1)
-    if (!$user->isAdmin() && intval($complain->level) < intval($user->role->level)) {
-        return response()->json([
-            'success' => false, 
-            'message' => 'عذراً، هذه الشكوى في مستوى إداري أعلى من صلاحياتك ولا يمكنك معالجتها.'
-        ], 403);
-    }
-
-    // 3. التحقق من التبعية (للموظف ومدير القسم لضمان بقائهم ضمن قسمهم فقط)
-    if ($user->isEmployee() || $user->isDeptManager()) {
-        if (intval($complain->department_id) !== intval($user->department_id)) {
-            return response()->json(['success' => false, 'message' => 'هذه الشكوى لا تتبع لقسمك.'], 403);
+        // 1. التحقق من الصلاحيات العامة (هل هو موظف، مدير، أو أدمن؟)
+        if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
         }
-    }
 
-    // 4. التحقق من إمكانية تغيير الحالة (Logic)
-    $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
-
-    if (!$allowedNextStatus) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Complaint is already resolved or in a final state.',
-        ], 422);
-    }
-
-    $nextStatusValue = is_array($allowedNextStatus) ? $allowedNextStatus[0] : $allowedNextStatus;
-    $previousStatus  = $complain->status;
-
-    // 5. تنفيذ التعديلات
-    $complain->status = $nextStatusValue;
-    
-    // توثيق رتبة المعالج الحالي (من التوكين)
-    $complain->assigned_level = $user->role->level; 
-
-    // إذا تحولت الحالة إلى "قيد المعالجة"
-    if ($nextStatusValue === Complain::STATUS_IN_PROGRESS) {
-        $complain->assigned_at = now(); 
-    }
-
-    // إذا تحولت الحالة إلى "تم الحل"
-    if ($nextStatusValue === Complain::STATUS_RESOLVED) {
-        $complain->resolved_at = now();
-        if ($complain->user) {
-            $complain->user->increment('score'); 
+        // 2. التحقق من الهرمية
+        if (!$user->isAdmin() && intval($complain->level) < intval($user->role->level)) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'عذراً، هذه الشكوى في مستوى إداري أعلى من صلاحياتك ولا يمكنك معالجتها.'
+            ], 403);
         }
-    }
 
-    $complain->save();
+        // 3. التحقق من التبعية (للموظف ومدير القسم لضمان بقائهم ضمن قسمهم فقط)
+        if ($user->isEmployee() || $user->isDeptManager()) {
+            if (intval($complain->department_id) !== intval($user->department_id)) {
+                return response()->json(['success' => false, 'message' => 'هذه الشكوى لا تتبع لقسمك.'], 403);
+            }
+        }
 
-    return response()->json([
-        'success' => true,
-        'message' => "Status updated from {$previousStatus} to {$nextStatusValue}",
-        'data' => [
-            'id'             => $complain->id,
-            'current_status' => $complain->status,
-            'assigned_level' => $complain->assigned_level,
-            'level_name'     => $user->role->name,
-            'user_new_score' => $complain->user ? $complain->user->score : 0
-        ]
-    ], 200);
+        // 4. التحقق من إمكانية تغيير الحالة (Logic)
+        $allowedNextStatus = Complain::STATUS_TRANSITIONS[$complain->status] ?? null;
 
-    
-        // إرسال الإشعار (نمرر القيمة النصية وليس المصفوفة)
+        if (!$allowedNextStatus) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complaint is already resolved or in a final state.',
+            ], 422);
+        }
+
+        $nextStatusValue = is_array($allowedNextStatus) ? $allowedNextStatus[0] : $allowedNextStatus;
+        $previousStatus  = $complain->status;
+
+        // 5. تنفيذ التعديلات
+        $complain->status = $nextStatusValue;
+        
+        // توثيق رتبة المعالج الحالي (من التوكين)
+        $complain->assigned_level = $user->role->level; 
+
+        // إذا تحولت الحالة إلى "قيد المعالجة"
+        if ($nextStatusValue === Complain::STATUS_IN_PROGRESS) {
+            $complain->assigned_at = now(); 
+        }
+
+        // إذا تحولت الحالة إلى "تم الحل" عبر التدفق الطبيعي
+        if ($nextStatusValue === Complain::STATUS_RESOLVED) {
+            $complain->resolved_at = now();
+            if ($complain->user) {
+                $complain->user->increment('score', 10); 
+            }
+        }
+
+        $complain->save();
+
+        // إرسال الإشعار للمستخدم
         $this->sendStatusEmail($complain, $nextStatusValue);
-    
-        // الرد النهائي الموحد (تم حذف الـ return الزائد الذي كان قبله)
+        
         return response()->json([
             'success' => true,
             'message' => "Status updated from {$previousStatus} to {$nextStatusValue}",
@@ -99,23 +117,23 @@ class ComplaintProcessingController extends \App\Http\Controllers\Controller
                 'id'             => $complain->id,
                 'current_status' => $complain->status,
                 'assigned_level' => $complain->assigned_level, 
-                'level_name'     => $complain->level_name,     
+                'level_name'     => $user->role->name,     
                 'user_new_score' => $complain->user ? $complain->user->score : null,
             ],
         ], 200);
     }
+    
     public function reject(Request $request, $id): JsonResponse
     {
-        $user = $request->user(); // جلب بيانات المستخدم من التوكين الحالي
+        $user = $request->user(); 
         $complain = Complain::with('user')->findOrFail($id);
     
-        // 1. تحديد مستوى الرفض والاسم بناءً على دور المستخدم (Role) من التوكين
-        // نفترض أن الأدوار هي: employee, dept_manager, auth_manager
+        // 1. تحديد مستوى الرفض بناءً على دور المستخدم
         $rejectionLevel = match(true) {
             $user->isEmployee() => 3,         
-            $user->isDeptManager() => 2,      // مدير قسم
-            $user->isAuthorityManager() => 1, // مدير جهة
-            $user->isAdmin() => 1,            // الأدمن يعامل كأعلى مستوى
+            $user->isDeptManager() => 2,      
+            $user->isAuthorityManager() => 1, 
+            $user->isAdmin() => 1,            
             default => null
         };
     
@@ -123,51 +141,75 @@ class ComplaintProcessingController extends \App\Http\Controllers\Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized role.'], 403);
         }
     
-        // 2. التحقق من التبعية (القسم أو الجهة) لضمان عدم رفض شكوى غريبة
+        // 2. التحقق من التبعية (القسم أو الجهة) لضمان الصلاحية الإقليمية
         if (!$user->isAdmin()) {
-            if ($rejectionLevel >= 2) { // موظف أو مدير قسم
+            if ($rejectionLevel >= 2) { 
                 if (intval($complain->department_id) !== intval($user->department_id)) {
                     return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
                 }
-            } else { // مدير جهة
+            } else { 
                 if (intval($complain->authority_id) !== intval($user->authority_id)) {
                     return response()->json(['success' => false, 'message' => 'Not authorized for this authority.'], 403);
                 }
             }
         }
     
-        // 3. التحقق من إدخال السبب
+        // 3. التحقق من إدخال سبب الرفض وجوباً
         $request->validate([
             'rejection_reason' => 'required|string|min:5',
         ]);
     
-        // 4. تنفيذ الرفض وخصم النقاط
-        // خصم نقطة واحدة من سكور اليوزر (أو القيمة التي تفضلينها)
-        if ($complain->user) {
-            $complain->user->decrement('score', 1); 
+        $student = $complain->user;
+        $isBanned = false;
+
+        // 4. تنفيذ نظام العقوبات التلقائي (السكور والحظر التلقائي)
+        if ($student) {
+            // أ. خفض السكور بمقدار 10 نقاط
+            $student->decrement('score', 10); 
+            
+            // ب. زيادة عداد الشكاوى الكاذبة
+            $student->increment('false_complaints_count');
+
+            // ج. شرط الطرد والحظر الحاسم (3 شكاوى كاذبة)
+            if ($student->false_complaints_count >= 3) {
+                $student->update(['is_banned' => true]);
+                $student->tokens()->delete(); // طرد فوري وسحب توكنات الفلاتر
+                $isBanned = true;
+            }
         }
     
+        // 5. تحديث الشكوى وحفظ سبب الرفض في حقل الـ notes
         $complain->update([
             'status' => 'Rejected',
             'notes' => $request->rejection_reason,
-            'assigned_level' => $rejectionLevel, // تخزين المستوى الذي قام بالرفض بناءً على التوكين
+            'assigned_level' => $rejectionLevel, 
         ]);
     
-        // 5.  إشعار
+        // إرسال إيميل بالرفض
         $this->sendStatusEmail($complain, 'Rejected');
     
+        if ($isBanned) {
+            return response()->json([
+                'success' => true,
+                'status' => 'banned',
+                'message' => "تم رفض الشكوى ككاذبة من قبل {$user->name}. تم حظر الطالب نهائياً من النظام وتدمير الجلسة لتجاوزه 3 شكاوى كاذبة."
+            ], 200);
+        }
+
+        // 🌟 التعديل السحري هنا: تم إدراج حقل الـ notes داخل الـ Response بنجاح
         return response()->json([
             'success' => true,
-            'message' => "تم رفض الشكوى بنجاح من قبل " . $user->name,
+            'message' => "تم رفض الشكوى ككاذبة بنجاح من قبل " . $user->name . " وخصم النقاط من الطالب.",
             'data' => [
-                'id' => $complain->id,
-                'status' => $complain->status,
+                'id'             => $complain->id,
+                'status'         => $complain->status,
                 'assigned_level' => $complain->assigned_level,
-                'level_name' => $complain->level_name, // سيعطي الاسم بناءً على الـ assigned_level الجديد
-                'user_new_score' => $complain->user ? $complain->user->score : null
+                'user_new_score' => $student ? $student->score : null,
+                'notes'          => $complain->notes, // الحقل الجديد ليظهر في الـ API
             ]
         ], 200);
     }
+
     /**
      * دالة التصعيد اليدوي: تنقل الشكوى للمستوى الإداري الأعلى بعد مرور المدة المحددة.
      */
@@ -272,7 +314,7 @@ class ComplaintProcessingController extends \App\Http\Controllers\Controller
             'is_open'  => $complain->chat->is_open && $complain->status === Complain::STATUS_IN_PROGRESS,
             'messages' => $complain->chat->messages->map(fn($m) => [
                 'message' => $m->message,
-                'sender'  => $m->sender->name,
+                'sender'  => $m->sender->name ?? 'النظام',
                 'sent_at' => $m->sent_at,
             ]),
         ];
