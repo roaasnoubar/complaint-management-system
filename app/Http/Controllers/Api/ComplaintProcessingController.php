@@ -58,8 +58,8 @@ class ComplaintProcessingController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
         }
 
-        // 2. التحقق من الهرمية
-        if (!$user->isAdmin() && intval($complain->level) < intval($user->role->level)) {
+        // 2. التحقق من الهرمية (تعديل الإشارة: يمنع لو صلاحية المستخدم أقل من مستوى الشكوى الحالي)
+        if (!$user->isAdmin() && intval($user->role->level) < intval($complain->level)) {
             return response()->json([
                 'success' => false, 
                 'message' => 'عذراً، هذه الشكوى في مستوى إداري أعلى من صلاحياتك ولا يمكنك معالجتها.'
@@ -128,12 +128,12 @@ class ComplaintProcessingController extends Controller
         $user = $request->user(); 
         $complain = Complain::with('user')->findOrFail($id);
     
-        // 1. تحديد مستوى الرفض بناءً على دور المستخدم
+        // 1. تحديد مستوى الرفض بناءً على دور المستخدم (تعديل الأرقام: الموظف 1، مدير القسم 2، مدير الجهة 3)
         $rejectionLevel = match(true) {
-            $user->isEmployee() => 3,         
+            $user->isEmployee() => 1,         
             $user->isDeptManager() => 2,      
-            $user->isAuthorityManager() => 1, 
-            $user->isAdmin() => 1,            
+            $user->isAuthorityManager() => 3, 
+            $user->isAdmin() => 3,            
             default => null
         };
     
@@ -143,7 +143,7 @@ class ComplaintProcessingController extends Controller
     
         // 2. التحقق من التبعية (القسم أو الجهة) لضمان الصلاحية الإقليمية
         if (!$user->isAdmin()) {
-            if ($rejectionLevel >= 2) { 
+            if ($rejectionLevel <= 2) { // تعديل الإشارة لتشمل الموظف ومدير القسم
                 if (intval($complain->department_id) !== intval($user->department_id)) {
                     return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
                 }
@@ -196,7 +196,6 @@ class ComplaintProcessingController extends Controller
             ], 200);
         }
 
-        // 🌟 التعديل السحري هنا: تم إدراج حقل الـ notes داخل الـ Response بنجاح
         return response()->json([
             'success' => true,
             'message' => "تم رفض الشكوى ككاذبة بنجاح من قبل " . $user->name . " وخصم النقاط من الطالب.",
@@ -205,13 +204,13 @@ class ComplaintProcessingController extends Controller
                 'status'         => $complain->status,
                 'assigned_level' => $complain->assigned_level,
                 'user_new_score' => $student ? $student->score : null,
-                'notes'          => $complain->notes, // الحقل الجديد ليظهر في الـ API
+                'notes'          => $complain->notes, 
             ]
         ], 200);
     }
 
     /**
-     * دالة التصعيد اليدوي: تنقل الشكوى للمستوى الإداري الأعلى بعد مرور المدة المحددة.
+     * دالة التصعيد اليدوي: تنقل الشكوى للمستوى الإداري الأعلى (تعديل التدرج: من 1 إلى 2 ومن 2 إلى 3).
      */
     public function escalate(Request $request, $id): JsonResponse
     {
@@ -226,10 +225,11 @@ class ComplaintProcessingController extends Controller
             ], 422);
         }
 
-        $nextLevel = match($complain->assigned_level) {
-            Complain::LEVEL_EMPLOYEE => Complain::LEVEL_MANAGER,
-            Complain::LEVEL_MANAGER  => Complain::LEVEL_HEAD,
-            default                  => null,
+        // التدرج التلقائي الصاعد بناءً على التعديل الجديد للـ ليفل
+        $nextLevel = match(intval($complain->assigned_level)) {
+            1 => 2, // من الموظف لمدير القسم
+            2 => 3, // من مدير القسم لمدير الجهة
+            default => null,
         };
 
         if (!$nextLevel) {
@@ -237,8 +237,9 @@ class ComplaintProcessingController extends Controller
         }
 
         $complain->update([
+            'level'          => $nextLevel, // تحديث المستوى المطلوب للمعالجة
             'assigned_level' => $nextLevel,
-            'assigned_at'    => now(), // تصفير العداد للمدير الجديد
+            'assigned_at'    => now(), // تصفير العداد للمسؤول الجديد
             'status'         => Complain::STATUS_PENDING, // تعود كأنها جديدة للمسؤول الأعلى
         ]);
 
@@ -248,8 +249,8 @@ class ComplaintProcessingController extends Controller
             'success' => true,
             'message' => 'تم تصعيد الشكوى بنجاح للمستوى الإداري الأعلى.',
             'data'    => [
-                'new_level_name' => $complain->level_name,
-                'assigned_at'    => $complain->assigned_at
+                'new_level'   => $complain->assigned_level,
+                'assigned_at' => $complain->assigned_at
             ]
         ]);
     }
@@ -265,7 +266,7 @@ class ComplaintProcessingController extends Controller
         ])->findOrFail($id);
 
         // الصلاحيات
-        if (!$user->isEmployee() && !$user->isAdmin()) {
+        if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 
