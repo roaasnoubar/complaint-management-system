@@ -18,7 +18,7 @@ class ChatController extends Controller
      */
     public function getChat(Request $request, $complainId): JsonResponse
     {
-        // جلب الشكوى أو إعطاء خطأ 404
+        // جلب الشكوى أو إعطاء خطأ 
         $complain = Complain::findOrFail($complainId);
         $user = auth()->user();
 
