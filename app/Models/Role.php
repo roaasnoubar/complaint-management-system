@@ -22,7 +22,7 @@ class Role extends Model
 
     const ADMIN    = 'admin';
     const EMPLOYEE = 'employee';
-    const USER     = 'citizen';
+    const USER     = 'user';
 
     public function permissions(): BelongsToMany
     {

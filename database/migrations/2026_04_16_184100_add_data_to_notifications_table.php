@@ -10,19 +10,18 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-    {
-        Schema::table('notifications', function (Blueprint $table) {
-            //
-        });
-    }
+{
+    Schema::table('notifications', function (Blueprint $table) {
+        if (!Schema::hasColumn('notifications', 'data')) {
+            $table->json('data')->after('type')->nullable();
+        }
+    });
+}
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::table('notifications', function (Blueprint $table) {
-            //
-        });
-    }
+public function down(): void
+{
+    Schema::table('notifications', function (Blueprint $table) {
+        $table->dropColumn('data');
+    });
+}
 };

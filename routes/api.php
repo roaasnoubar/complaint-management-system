@@ -205,10 +205,10 @@ Route::middleware('auth:sanctum')->group(function () {
     
         // 2. رابط فتح محادثة (من مدير القسم مع مقدم الشكوى)
         // POST: /api/conversations/open
-        Route::post('/conversations/open', [ConversationController::class, 'startChat']);
+        //Route::post('/conversations/open', [ConversationController::class, 'startChat']);
         
         // 3. رابط لجلب الرسائل داخل المحادثة (للتأكد من نجاح الفتح)
-        Route::get('/conversations/{id}/messages', [ConversationController::class, 'getMessages']);
+        //Route::get('/conversations/{id}/messages', [ConversationController::class, 'getMessages']);
     });
     
 Route::middleware(['auth:sanctum', 'role:admin,authority_manager,dept_manager,employee'])->group(function () {

@@ -19,9 +19,8 @@ class DatabaseSeeder extends Seeder
         // 1. تشغيل Seeder البيانات الأساسية
         $this->call(ERDDatabaseSeeder::class);
 
-        // 2. جلب الأدوار والجهات
         $adminRole    = Role::where('name', 'admin')->first();
-        $managerRole  = Role::where('name', 'manager')->first(); 
+        $managerRole  = Role::where('name', 'manager')->first(); // دور مدير الجامعة (Level 1)
         $employeeRole = Role::where('name', 'employee')->first();
         $userRole     = Role::where('name', 'user')->first();
         

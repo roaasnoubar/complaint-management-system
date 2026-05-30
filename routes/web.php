@@ -53,7 +53,7 @@ Route::get('/run-logic', function () {
         ->where('assigned_at', '<=', $delay) // استخدمنا assigned_at لضمان الدقة
         ->update([
             'assigned_level' => 2,
-            'assigned_at' => $now, // تحديث الوقت لتبدأ دقيقة المدير الجديد من الآن
+            'assigned_at' => $now, 
             'updated_at' => $now
         ]);
 

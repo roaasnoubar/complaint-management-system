@@ -13,9 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         // تسجيل الميدل وير
-        //$middleware->alias([
-            //'role' => \App\Http\Middleware\CheckRole::class,
-        //]);
+        $middleware->alias([
+            'role' => \App\Http\Middleware\CheckRole::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // إجبار النظام على إرجاع JSON في حال فشل المصادقة
@@ -33,6 +33,6 @@ return Application::configure(basePath: dirname(__DIR__))
         \App\Console\Commands\EscalateComplaints::class,
     ])
     ->withMiddleware(function (Middleware $middleware) {
-        //$middleware->append(\App\Http\Middleware\CheckEscalation::class);
+        $middleware->append(\App\Http\Middleware\CheckEscalation::class);
     })
     ->create();

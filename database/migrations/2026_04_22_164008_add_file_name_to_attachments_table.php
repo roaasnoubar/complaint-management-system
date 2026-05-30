@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $table->string('file_name')->nullable()->after('file_type');
         Schema::table('attachments', function (Blueprint $table) {
             //
         });

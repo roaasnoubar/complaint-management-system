@@ -10,20 +10,23 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-    {
+{
+    if (!Schema::hasColumn('complains', 'notes')) {
         Schema::table('complains', function (Blueprint $table) {
-            //
-            $table->string('priority')->default('normal')->after('description');
+            $table->text('notes')->nullable();
         });
     }
+}
+    
+    
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
-    {
-        Schema::table('complains', function (Blueprint $table) {
-            //
-        });
-    }
+{
+    Schema::table('complains', function (Blueprint $table) {
+        $table->dropColumn('notes');
+    });
+}
 };
