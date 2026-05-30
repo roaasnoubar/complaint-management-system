@@ -11,11 +11,11 @@ return new class extends Migration
      */
     public function up(): void
 {
-    if (!Schema::hasColumn('complains', 'notes')) {
+    //if (!Schema::hasColumn('complains', 'notes')) {
         Schema::table('complains', function (Blueprint $table) {
             $table->text('notes')->nullable();
         });
-    }
+    //}
 }
     
     
