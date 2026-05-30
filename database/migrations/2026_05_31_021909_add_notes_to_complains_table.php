@@ -10,23 +10,22 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    //if (!Schema::hasColumn('complains', 'notes')) {
+    {
         Schema::table('complains', function (Blueprint $table) {
-            $table->text('notes')->nullable();
+            // نتحقق أولاً هل العمود موجود لتجنب أي خطأ
+            if (!Schema::hasColumn('complains', 'notes')) {
+                $table->text('notes')->nullable();
+            }
         });
-    //}
-}
-    
-    
+    }
 
     /**
-     * Reverse  migrations.
+     * Reverse the migrations.
      */
     public function down(): void
-{
-    Schema::table('complains', function (Blueprint $table) {
-        $table->dropColumn('notes');
-    });
-}
+    {
+        Schema::table('complains', function (Blueprint $table) {
+            //
+        });
+    }
 };

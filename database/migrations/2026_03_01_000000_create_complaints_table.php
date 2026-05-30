@@ -28,6 +28,7 @@ return new class extends Migration
             
             $table->string('title');
             $table->text('description');
+            $table->text('notes')->nullable();
             
             // التأكد من تطابق الحالات مع الموديل
             $table->enum('status', ['Pending', 'In Progress', 'Resolved', 'Rejected'])->default('Pending');

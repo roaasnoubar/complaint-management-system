@@ -1,4 +1,5 @@
 <?php
+setlocale(LC_ALL, 'en_US.UTF-8');
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 

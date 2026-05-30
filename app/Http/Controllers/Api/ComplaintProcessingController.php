@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
 use App\Mail\StatusChangedMail;
 use App\Http\Resources\Api\ComplainResource;
 use App\Models\Complain;
@@ -123,9 +124,26 @@ class ComplaintProcessingController extends Controller
         ], 200);
     }
     
-
-    public function reject(Request $request, $id): JsonResponse
+    public function reject(Request $request, $id)
     {
+        // 1. استخدمي واجهة الـ DB مباشرة مع استعلام نصي (Raw Query)
+        // هذا لا يعتمد على الموديل ولا على الكاش
+        $result = \DB::statement("UPDATE complains SET status = 'Rejected', notes = ? WHERE id = ?", [
+            $request->rejection_reason ?? 'لا يوجد سبب',
+            $id
+        ]);
+    
+        // 2. إذا نجح التحديث سيعود بقيمة true
+        if ($result) {
+            return response()->json(['message' => 'تم الرفض بنجاح']);
+        }
+    
+        return response()->json(['message' => 'فشل التحديث'], 500);
+    }
+     /*public function reject(Request $request, $id): JsonResponse
+    {
+        
+        /*
         $user = $request->user(); 
         $complain = Complain::with('user')->findOrFail($id);
     
@@ -207,9 +225,10 @@ class ComplaintProcessingController extends Controller
                 'user_new_score' => $student ? $student->score : null,
                 'notes'          => $complain->notes, 
             ]
-        ], 200);
+     
+       ], 200);/*
     }
-
+    
     /**
      * دالة التصعيد اليدوي: تنقل الشكوى للمستوى الإداري الأعلى (تعديل التدرج: من 1 إلى 2 ومن 2 إلى 3).
      */
@@ -238,7 +257,7 @@ class ComplaintProcessingController extends Controller
         }
 
         $complain->update([
-            //'level'          => $nextLevel, // تحديث المستوى المطلوب للمعالجة
+            'level'          => $nextLevel, // تحديث المستوى المطلوب للمعالجة
             'assigned_level' => $nextLevel,
             'assigned_at'    => now(), // تصفير العداد للمسؤول الجديد
             'status'         => Complain::STATUS_PENDING, // تعود كأنها جديدة للمسؤول الأعلى

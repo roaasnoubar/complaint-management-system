@@ -206,11 +206,11 @@ Route::middleware('auth:sanctum')->group(function () {
         //Route::get('/conversations/{id}/messages', [ConversationController::class, 'getMessages']);
     });
     
-Route::middleware(['auth:sanctum', 'role:admin,authority_manager,dept_manager,employee'])->group(function () {
+//Route::middleware(['auth:sanctum', 'role:admin,authority_manager,dept_manager,employee'])->group(function () {
     Route::get('/complaints/filter/{status}', [ComplaintController::class, 'getComplaintsByStatus']);
     Route::post('/complaints/{id}/status', [ComplaintProcessingController::class, 'updateStatus']);
     Route::post('/complaints/{id}/reject', [ComplaintProcessingController::class, 'reject']);
-});
+//});
 Route::middleware('auth:sanctum')->group(function () {
     
     // رابط إرسال التقييم من الموبايل (تمرير معرف الشكوى في الرابط)

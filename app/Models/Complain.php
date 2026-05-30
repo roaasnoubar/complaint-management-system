@@ -34,6 +34,9 @@ class Complain extends Model
         'admin_reply',
         'processed_by',
     ];
+    public function getTableColumns() {
+        return $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
+    }
 
     // إضافة الحقول الوهمية للـ JSON لسهولة التعامل مع الأندرويد
     protected $appends = ['created_at_human', 'level_name', 'can_chat' , 'status_color'];
