@@ -123,6 +123,7 @@ class ComplaintProcessingController extends Controller
         ], 200);
     }
     
+
     public function reject(Request $request, $id): JsonResponse
     {
         $user = $request->user(); 
@@ -237,7 +238,7 @@ class ComplaintProcessingController extends Controller
         }
 
         $complain->update([
-            'level'          => $nextLevel, // تحديث المستوى المطلوب للمعالجة
+            //'level'          => $nextLevel, // تحديث المستوى المطلوب للمعالجة
             'assigned_level' => $nextLevel,
             'assigned_at'    => now(), // تصفير العداد للمسؤول الجديد
             'status'         => Complain::STATUS_PENDING, // تعود كأنها جديدة للمسؤول الأعلى

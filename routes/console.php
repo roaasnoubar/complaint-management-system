@@ -1,25 +1,42 @@
 <?php
 
 use Illuminate\Support\Facades\Schedule;
-use Illuminate\Support\Facades\Http;
+use App\Models\Complain;
+use Carbon\Carbon;
 
 /*
 |--------------------------------------------------------------------------
 | Console Routes & Task Scheduling
 |--------------------------------------------------------------------------
 |
-| هذا الملف مسؤول عن جدولة المهام التلقائية في لارافيل.
-| قمنا ببرمجة السيرفر هنا ليزور رابط التصعيد الذكي الخاص بكِ كل دقيقة
-| ليتم فحص الوقت وتحديث جدول الشكاوى صامتاً خلف الكواليس.
+| هذا الملف مسؤول عن المهام التلقائية (Cron Jobs).
+| يتم تنفيذ هذه المهمة في الخلفية كل دقيقة بدقة عالية.
 |
 */
 
-// جدولة الاتصال التلقائي برابط التصعيد كل دقيقة بالثانية
 Schedule::call(function () {
-    try {
-        // السيرفر يقوم بطلب الرابط محلياً لتشغيل كود دمشق وحالة Pending
-        Http::get('http://127.0.0.1:8000/api/escalate-complaints');
-    } catch (\Exception $e) {
-        // تم وضع الـ catch فارغة لضمان عدم ظهور أخطاء بالتيرمنال في حال إعادة تشغيل السيرفر
-    }
-})->everyMinute();
+    // 1. تحديد التوقيت بدقة (بتوقيت دمشق)
+    $now = Carbon::now('Asia/Damascus');
+    
+    // 2. تحديد المهلة الزمنية (دقيقة + 5 ثوانٍ إضافية كمرونة تقنية)
+    $delay = (clone $now)->subMinute()->addSeconds(5);
+
+    // 3. تنفيذ عملية التصعيد التلقائي
+    // نبحث عن الشكاوى المعلقة التي لم يتم معالجتها بعد وتجاوزت الوقت المسموح
+    Complain::where('status', 'Pending')
+        ->whereIn('assigned_level', [2, 3])
+        ->whereNull('processed_by')
+        ->where('assigned_at', '<=', $delay)
+        ->chunk(100, function ($complaints) use ($now) {
+            foreach ($complaints as $complaint) {
+                // التصعيد: 2 يصبح 1، و 3 يصبح 2
+                $newLevel = ($complaint->assigned_level == 2) ? 1 : 2;
+                
+                $complaint->update([
+                    'assigned_level' => $newLevel,
+                    'assigned_at'    => $now,
+                    'updated_at'     => $now
+                ]);
+            }
+        });
+})->everyMinute()->withoutOverlapping(); 

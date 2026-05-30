@@ -30,11 +30,7 @@ Route::prefix('auth')->group(function () {
 Route::get('/ping', function () {
     return response()->json(['status' => 'OK', 'message' => 'Server is running']);
 });
-Route::prefix('auth')->group(function () {
-    Route::post('/register',     [AuthController::class, 'register']);
-    Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
-    Route::post('/login',        [AuthController::class, 'login']);
-});
+
 
 // انقليه إلى هنا (خارج الـ middleware) ليعمل في البوست مان بدون Token
 // -------------------------------------------------------------------------
@@ -122,10 +118,9 @@ Route::get('/escalate-complaints', function () {
 Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])->group(function () {
     
     // --- حساب المستخدم ---
-    Route::prefix('auth')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::get('/me',      [AuthController::class, 'me']);
-        
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::get('me', [AuthController::class, 'me']);
     });
 
     // --- 1. الأدمن العام (Super Admin) ---
