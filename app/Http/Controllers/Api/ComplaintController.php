@@ -73,6 +73,7 @@ class ComplaintController extends Controller
      */
     public function index(Request $request): JsonResponse
 {
+    return response()->json(['debug_message' => 'Controller reached successfully!'], 200);
     $user = $request->user();
     $now = \Carbon\Carbon::now();
 
@@ -145,7 +146,7 @@ class ComplaintController extends Controller
         };
 
         // إضافة حقل للوقت المنقضي بشكل نصي (اختياري للفرونت إند)
-        $complaint->created_at_human = $complaint->created_at->diffForHumans();
+        $complaint->created_at_human = $complaint->created_at ? $complaint->created_at->diffForHumans() : 'منذ فترة غير محددة';
 
         return $complaint;
     });
@@ -551,5 +552,23 @@ public function respond(Request $request, $id)
             ]
         ]
     ]);
+}
+/**
+ * دالة جلب شكاوى المستخدم المسجل (هذه هي الدالة الناقصة)
+ */
+public function userComplaints(Request $request): JsonResponse
+{
+    $user = $request->user();
+    // جلب الشكاوى الخاصة بالمستخدم فقط
+    $complaints = \App\Models\Complain::with(['authority', 'department'])
+        ->where('user_id', $user->id)
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+    return response()->json([
+        'success' => true,
+        'count' => $complaints->count(),
+        'data' => $complaints
+    ], 200);
 }
 }

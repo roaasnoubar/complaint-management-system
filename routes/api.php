@@ -151,21 +151,25 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])
     // --- 3. نظام الشكاوى (الموظف) ---Route::middleware(['auth:sanctum'])->group(function () {
     
     // أضيفي auth:sanctum قبل role لضمان التعرف على المستخدم
-Route::prefix('employee')->middleware(['auth:sanctum', 'role:manager,admin,dept_manager,employee'])->group(function () {
-    Route::get('/list', [EmployeeComplaintController::class, 'getComplaints'])->name('employee.complaints.list');
-    Route::get('/view/{id}', [EmployeeComplaintController::class, 'getComplaint'])->name('employee.complaints.view');
-    Route::apiResource('manage-complaints', ComplaintController::class)
-          ->names('employee.manage.complaints')
-          ->only(['index', 'show']);
-    Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
-});
+// --- تجميع كل المسارات المحمية تحت توثيق واحد ---
+Route::middleware('auth:sanctum')->group(function () {
 
-    // --- 4. نظام الشكاوى (المستخدم العادي) ---
+    // أ. مسارات الموظف (بصلاحيات خاصة)
+    Route::prefix('employee')->middleware('role:manager,admin,dept_manager,employee')->group(function () {
+        Route::get('/list', [EmployeeComplaintController::class, 'getComplaints']);
+        Route::get('/view/{id}', [EmployeeComplaintController::class, 'getComplaint']);
+        Route::apiResource('manage-complaints', ComplaintController::class)->only(['index', 'show']);
+        Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
+    });
+
+    // ب. مسارات المستخدم العادي (محمية بـ auth:sanctum)
     Route::get('/departments', [DepartmentController::class, 'index']); 
     Route::post('/complaints', [ComplaintController::class, 'store']); 
     Route::get('/my-complaints', [ComplaintController::class, 'userComplaints']);
     Route::get('/authorities', [AuthorityController::class, 'index']);
     Route::get('/complaints/{id}', [ComplaintController::class, 'show']); 
+});
+});
     // --- 5. نظام المحادثة (Chat API) ---
     Route::prefix('chat')->group(function () {
         Route::get('/complaints/{complainId}', [ChatController::class, 'getChat']); 
@@ -221,4 +225,4 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // رابط جلب تقييمات وتوزيع نجوم جهة معينة للـ Dashboard (متاح للجميع أو حسب الصلاحيات)
 Route::get('/authorities/{id}/ratings', [RatingController::class, 'getAuthorityRatings']);
-});
+
