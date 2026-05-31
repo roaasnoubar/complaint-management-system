@@ -16,15 +16,16 @@ use App\Http\Controllers\Api\ComplainChatController;
 use App\Http\Controllers\Api\RatingController;
 use App\Models\Complain;
 use Carbon\Carbon;
+
 /*
 |--------------------------------------------------------------------------
 | Public Routes (المسارات العامة)
 |--------------------------------------------------------------------------
 */
 Route::prefix('auth')->group(function () {
-    Route::post('/register',     [AuthController::class, 'register']);
+    Route::post('/register',    [AuthController::class, 'register']);
     Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
-    Route::post('/login',         [AuthController::class, 'login']);
+    Route::post('/login',        [AuthController::class, 'login']);
 });
 
 Route::get('/ping', function () {
@@ -110,6 +111,7 @@ Route::get('/escalate-complaints', function () {
         'total_count' => 0
     ], 200);
 });
+
 /*
 |--------------------------------------------------------------------------
 | Protected Routes (Sanctum) - المسارات المحمية
@@ -126,7 +128,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])
     // --- 1. الأدمن العام (Super Admin) ---
     Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
         Route::post('/create-user', [UserManagementController::class, 'store'])
-              ->middleware('role:admin,authority_manager'); // تأكدي من مسمى الدور لديكِ (manager أم authority_manager)
+              ->middleware('role:admin,authority_manager'); 
               
         Route::apiResource('authorities', AuthorityController::class)
               ->names('admin.authorities')
@@ -134,90 +136,74 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])
     
         Route::get('/users', [UserManagementController::class, 'index']);
     });
-  
-
+ 
     Route::prefix('manager')->middleware(['auth:sanctum', 'role:manager,dept_manager'])->group(function () {
         Route::get('/my-departments', [DepartmentController::class, 'index']); 
         Route::post('/create-employee', [UserManagementController::class, 'store']);
         Route::get('/statistics', [DashboardController::class, 'getAuthorityStats']);
-            Route::get('/complaints', [ComplaintController::class, 'index']); 
+        Route::get('/complaints', [ComplaintController::class, 'index']); 
         Route::get('/complaints/{id}', [ComplaintController::class, 'show']);
     });
-    // --- 3. نظام الشكاوى (الموظف) ---Route::middleware(['auth:sanctum'])->group(function () {
-    
-    // أضيفي auth:sanctum قبل role لضمان التعرف على المستخدم
-// --- تجميع كل المسارات المحمية تحت توثيق واحد ---
-Route::middleware('auth:sanctum')->group(function () {
 
-    // أ. مسارات الموظف (بصلاحيات خاصة)
-    Route::prefix('employee')->middleware('role:manager,admin,dept_manager,employee')->group(function () {
-        Route::get('/list', [EmployeeComplaintController::class, 'getComplaints']);
-        Route::get('/view/{id}', [EmployeeComplaintController::class, 'getComplaint']);
-        Route::apiResource('manage-complaints', ComplaintController::class)->only(['index', 'show']);
-        Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
-    });
-
-    // ب. مسارات المستخدم العادي (محمية بـ auth:sanctum)
-    Route::get('/departments', [DepartmentController::class, 'index']); 
-    Route::post('/complaints', [ComplaintController::class, 'store']); 
-    Route::get('/my-complaints', [ComplaintController::class, 'userComplaints']);
-    Route::get('/authorities', [AuthorityController::class, 'index']);
-    Route::get('/complaints/{id}', [ComplaintController::class, 'show']); 
-});
-});
-    // --- 5. نظام المحادثة (Chat API) ---
-    Route::prefix('chat')->group(function () {
-        Route::get('/complaints/{complainId}', [ChatController::class, 'getChat']); 
-        Route::get('/full-details/{complain}', [ComplaintController::class, 'show']);
-        Route::post('/send-message/{complainId}', [ChatController::class, 'sendMessage']); 
-        Route::get('/all', [ChatController::class, 'getAllChats']);
-        Route::post('/open/{complainId}', [ChatController::class, 'openChat']);
-        Route::post('/read/{complainId}', [ComplainChatController::class, 'markAsRead']); 
-    });
-
-    // --- 6. الإحصائيات (Dashboard) ---
-    Route::prefix('dashboard')->group(function () {
-        Route::get('/statistics',                [DashboardController::class, 'getStatistics']);
-        Route::get('/complaints-by-authority',   [DashboardController::class, 'complaintsByAuthority']);
-        Route::get('/complaints-by-department',  [DashboardController::class, 'complaintsByDepartment']);
-        Route::get('/monthly-complaints',        [DashboardController::class, 'monthlyComplaints']);
-    });
-
-    // --- 7. التنبيهات (Notifications) ---
-    Route::prefix('notifications')->group(function () {
-        Route::get('/',            [NotificationController::class, 'index']);
-        Route::get('/latest',      [NotificationController::class, 'latest']);
-        Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
-        Route::put('/read-all',    [NotificationController::class, 'markAllAsRead']);
-        Route::put('/{id}/read',   [NotificationController::class, 'markAsRead']);
-        Route::delete('/clear-all', [NotificationController::class, 'deleteAll']);
-        Route::delete('/{id}',      [NotificationController::class, 'destroy']);
-    });
-
+    // --- 3. نظام الشكاوى (الموظف) ---
+    // --- تجميع كل المسارات المحمية تحت توثيق واحد ---
     Route::middleware('auth:sanctum')->group(function () {
 
+        // أ. مسارات الموظف (بصلاحيات خاصة)
+        Route::prefix('employee')->middleware('role:manager,admin,dept_manager,employee')->group(function () {
+            Route::get('/list', [EmployeeComplaintController::class, 'getComplaints']);
+            Route::get('/view/{id}', [EmployeeComplaintController::class, 'getComplaint']);
+            Route::apiResource('manage-complaints', ComplaintController::class)->only(['index', 'show']);
+            Route::post('/complaints/{id}/respond', [ComplaintController::class, 'respond']);
+        });
+
+        // ب. مسارات المستخدم العادي (محمية بـ auth:sanctum)
+        Route::get('/departments', [DepartmentController::class, 'index']); 
+        Route::post('/complaints', [ComplaintController::class, 'store']); 
+        Route::get('/my-complaints', [ComplaintController::class, 'userComplaints']);
+        Route::get('/authorities', [AuthorityController::class, 'index']);
+        Route::get('/complaints/{id}', [ComplaintController::class, 'show']); 
+
+        // --- 5. نظام المحادثة (Chat API) ---
+        Route::prefix('chat')->group(function () {
+            Route::get('/complaints/{complainId}', [ChatController::class, 'getChat']); 
+            Route::get('/full-details/{complain}', [ComplaintController::class, 'show']);
+            Route::post('/send-message/{complainId}', [ChatController::class, 'sendMessage']); 
+            Route::get('/all', [ChatController::class, 'getAllChats']);
+            Route::post('/open/{complainId}', [ChatController::class, 'openChat']);
+            Route::post('/read/{complainId}', [ComplainChatController::class, 'markAsRead']); 
+        });
+
+        // --- 6. الإحصائيات (Dashboard) ---
+        Route::prefix('dashboard')->group(function () {
+            Route::get('/statistics',                 [DashboardController::class, 'getStatistics']);
+            Route::get('/complaints-by-authority',   [DashboardController::class, 'complaintsByAuthority']);
+            Route::get('/complaints-by-department',  [DashboardController::class, 'complaintsByDepartment']);
+            Route::get('/monthly-complaints',        [DashboardController::class, 'monthlyComplaints']);
+        });
+
+        // --- 7. التنبيهات (Notifications) ---
+        Route::prefix('notifications')->group(function () {
+            Route::get('/',            [NotificationController::class, 'index']);
+            Route::get('/latest',      [NotificationController::class, 'latest']);
+            Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
+            Route::put('/read-all',    [NotificationController::class, 'markAllAsRead']);
+            Route::put('/{id}/read',   [NotificationController::class, 'markAsRead']);
+            Route::delete('/clear-all', [NotificationController::class, 'deleteAll']);
+            Route::delete('/{id}',      [NotificationController::class, 'destroy']);
+        });
+
         Route::post('/complaints/{id}/escalate', [ComplaintController::class, 'escalateToManager']);
-    
-        // 2. رابط فتح محادثة (من مدير القسم مع مقدم الشكوى)
-        // POST: /api/conversations/open
-        //Route::post('/conversations/open', [ConversationController::class, 'startChat']);
         
-        // 3. رابط لجلب الرسائل داخل المحادثة (للتأكد من نجاح الفتح)
-        //Route::get('/conversations/{id}/messages', [ConversationController::class, 'getMessages']);
+        //Route::middleware(['auth:sanctum', 'role:admin,authority_manager,dept_manager,employee'])->group(function () {
+            Route::get('/complaints/filter/{status}', [ComplaintController::class, 'getComplaintsByStatus']);
+            Route::post('/complaints/{id}/status', [ComplaintProcessingController::class, 'updateStatus']);
+            Route::post('/complaints/{id}/reject', [ComplaintProcessingController::class, 'reject']);
+        //});
+
+        Route::post('/complains/{id}/rate', [RatingController::class, 'submitRating']);
+
+        // رابط جلب تقييمات وتوزيع نجوم جهة معينة للـ Dashboard
+        Route::get('/authorities/{id}/ratings', [RatingController::class, 'getAuthorityRatings']);
     });
-    
-//Route::middleware(['auth:sanctum', 'role:admin,authority_manager,dept_manager,employee'])->group(function () {
-    Route::get('/complaints/filter/{status}', [ComplaintController::class, 'getComplaintsByStatus']);
-    Route::post('/complaints/{id}/status', [ComplaintProcessingController::class, 'updateStatus']);
-    Route::post('/complaints/{id}/reject', [ComplaintProcessingController::class, 'reject']);
-//});
-Route::middleware('auth:sanctum')->group(function () {
-    
-    // رابط إرسال التقييم من الموبايل (تمرير معرف الشكوى في الرابط)
-    Route::post('/complains/{id}/rate', [RatingController::class, 'submitRating']);
-    
 });
-
-// رابط جلب تقييمات وتوزيع نجوم جهة معينة للـ Dashboard (متاح للجميع أو حسب الصلاحيات)
-Route::get('/authorities/{id}/ratings', [RatingController::class, 'getAuthorityRatings']);
-
