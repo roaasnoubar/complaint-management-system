@@ -2,6 +2,44 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Notification extends Model
+{
+    use HasFactory;
+
+    const TYPE_COMPLAINT_ASSIGNED = 'complaint_assigned';
+    const TYPE_COMPLAINT_RESOLVED = 'complaint_resolved';
+    const TYPE_COMPLAINT_ESCALATED = 'complaint_escalated';
+    const TYPE_COMPLAINT_SUBMITTED = 'complaint_submitted';
+    const TYPE_STATUS_CHANGED = 'status_changed';
+    const TYPE_RESOLVED            = 'resolved';
+    const TYPE_ESCALATED = 'escalated';
+    protected $fillable = [
+        'user_id',
+        'title',
+        'message',
+        'type',
+        'data',
+        'is_read',
+    ];
+
+    protected $casts = [
+        'data' => 'array',
+        'is_read' => 'boolean',
+    ];
+
+    // علاقة الإشعار بالمستخدم
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+}
+
+/*namespace App\Models;
+
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -18,7 +56,7 @@ class User extends Authenticatable
      * الحقول القابلة للتعبئة (Fillable)
      * تأكدي من مطابقتها لأعمدة الجدول في قاعدة البيانات
      */
-    protected $fillable = [
+  /*/*  protected $fillable = [
         'name',
         'username',
         'email',
@@ -40,7 +78,7 @@ class User extends Authenticatable
     /**
      * الحقول المخفية عند تحويل الموديل إلى JSON
      */
-    protected $hidden = [
+   /* protected $hidden = [
         'password',
         'remember_token',
         'verification_code',
@@ -49,7 +87,7 @@ class User extends Authenticatable
     /**
      * تحويل أنواع البيانات (Casting)
      */
-    protected $casts = [
+    /*protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'birthdate' => 'date',
@@ -64,7 +102,7 @@ class User extends Authenticatable
     /**
      * علاقة المستخدم مع الإشعارات الخاصة به
      */
-    public function notifications(): HasMany
+   /* public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class, 'user_id', 'id');
     }
@@ -72,7 +110,7 @@ class User extends Authenticatable
     /**
      * علاقة المستخدم مع الدور (الرتبة)
      */
-    public function role(): BelongsTo
+   /* public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
     }
@@ -80,7 +118,7 @@ class User extends Authenticatable
     /**
      * علاقة المستخدم مع الجهة التابع لها (مثل جامعة الشام)
      */
-    public function authority(): BelongsTo
+    /*public function authority(): BelongsTo
     {
         return $this->belongsTo(Authority::class, 'authority_id');
     }
@@ -88,7 +126,7 @@ class User extends Authenticatable
     /**
      * علاقة المستخدم مع القسم (مثل قسم المعلوماتية)
      */
-    public function department(): BelongsTo
+    /*public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
     }
@@ -104,7 +142,7 @@ class User extends Authenticatable
      * @param array $data بيانات إضافية (مثل complaint_id)
      * @return \Illuminate\Database\Eloquent\Model
      */
-    public function sendNotification(string $title, string $message, string $type, array $data = [])
+    /*public function sendNotification(string $title, string $message, string $type, array $data = [])
     {
         return $this->notifications()->create([
             'title'   => $title,
@@ -114,4 +152,4 @@ class User extends Authenticatable
             'is_read' => false,
         ]);
     }
-}
+}*/
