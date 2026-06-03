@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ComplainChatController;
 use App\Http\Controllers\Api\RatingController;
 use App\Models\Complain;
+use Illuminate\Support\Facades\Artisan;
 use Carbon\Carbon;
 
 /*
@@ -206,4 +207,5 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])
         // رابط جلب تقييمات وتوزيع نجوم جهة معينة للـ Dashboard
         Route::get('/authorities/{id}/ratings', [RatingController::class, 'getAuthorityRatings']);
     });
+    
 });
