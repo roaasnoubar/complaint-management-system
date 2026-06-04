@@ -99,7 +99,7 @@ class AuthController extends Controller
     
     public function login(Request $request): JsonResponse
 {
-    // 1. التحقق من البيانات
+   
     $credentials = $request->validate([
         'username' => 'required|string',
         'password' => 'required|string',
@@ -108,7 +108,6 @@ class AuthController extends Controller
     // 2. تحديد نوع الحقل
     $loginField = filter_var($request->username, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
-    // 3. محاولة تسجيل الدخول
     if (!Auth::attempt([$loginField => $request->username, 'password' => $request->password])) {
         return response()->json([
             'success' => false,
@@ -116,21 +115,19 @@ class AuthController extends Controller
         ], 401);
     }
 
-    // 4. جلب المستخدم والتحقق من التفعيل (الإضافة هنا)
     $user = Auth::user();
 
-        // الفحص المعدّل: الطالب فقط (Role ID = 5) هو من يطالب بكود الـ OTP إذا كان حسابه غير مفعل
         if ($user->role_id == 5 && !$user->is_verified) {
             Auth::logout(); 
             
             return response()->json([
                 'success' => false,
-                'status' => 'verify_account', // نرسل الستيتوس للفلاتر ليعرف أنه يحتاج توجيه لشاشة الـ OTP
+                'status' => 'verify_account', 
                 'message' => 'يرجى تفعيل الحساب أولاً عبر الكود المرسل لإيميلك.'
             ], 403);
     }
 
-    // 5. إنشاء التوكن في حال كان الحساب مفعلاً
+  
     $token = $user->createToken('auth_token')->plainTextToken;
 
     return response()->json([
@@ -143,9 +140,7 @@ class AuthController extends Controller
         ],
     ], 200);
 }
-    /**
-     * إنشاء حساب موظف جديد (للآدمن)
-     */
+    
     public function registerEmployee(Request $request): JsonResponse
     {
         $validated = $request->validate([

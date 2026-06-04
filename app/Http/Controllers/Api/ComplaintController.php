@@ -11,9 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 class ComplaintController extends Controller
 {
-    /**
-     * تقديم شكوى جديدة
-     */
+  
     public function store(Request $request)
     {
         if (!auth()->user()->is_verified) {
@@ -33,7 +31,6 @@ class ComplaintController extends Controller
         ]);
         $complaintNumber = now()->format('Ymd') . '-' . rand(1000, 9999);
     
-        // 2. إنشاء الشكوى (بدون أي إنشاء للمحادثة)
         $complain = Complain::create([
             'complain_number' => $complaintNumber,
             'user_id'       => auth()->id(),
@@ -45,9 +42,7 @@ class ComplaintController extends Controller
             'priority'      => $request->priority ?? 'normal',
             'status'        => 'Pending',
             'assigned_level' => 3,
-            // 'can_chat'   => false, // إذا كان عندك هذا الحقل في الجدول، اجعليه false افتراضياً
         ]);
-        // 3. رفع المرفقات
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
                 $path = $file->store('complaints/attachments', 'public');
@@ -60,7 +55,6 @@ class ComplaintController extends Controller
             }
         }
     
-        // 4. الرد النهائي (نرسل البيانات بدون محادثة)
         return response()->json([
             'success' => true,
             'message' => 'تم تقديم الشكوى بنجاح برقم: ' . $complain->complain_number,
@@ -68,16 +62,13 @@ class ComplaintController extends Controller
         ], 201);
     }
 
-    /**
-     * جلب قائمة الشكاوى الخاصة بالمستخدم المسجل حالياً
-     */
+    
     public function index(Request $request): JsonResponse
 {
     return response()->json(['debug_message' => 'Controller reached successfully!'], 200);
     $user = $request->user();
     $now = \Carbon\Carbon::now();
 
-    // 1. تحديث شامل لقاعدة البيانات (التصعيد التلقائي) قبل جلب البيانات
 \DB::table('complains')
     ->where('assigned_level', 2) 
     ->where('assigned_at', '<=', $now->copy()->subMinutes(2))
@@ -88,7 +79,6 @@ class ComplaintController extends Controller
         'updated_at'     => $now
     ]);
 
-// أي شكوى عند الموظف (Level 3) ومر عليها دقيقة واحدة ولم تُحل
 \DB::table('complains')
     ->where('assigned_level', 3)
     ->where('assigned_at', '<=', $now->copy()->subMinutes(1))
@@ -101,43 +91,37 @@ class ComplaintController extends Controller
     // 2. بناء الاستعلام بناءً على الصلاحيات
     $query = Complain::with(['authority:id,name', 'department:id,name', 'attachments', 'user:id,name']);
 
-    if ($user->role?->level === 1) { // مدير الجهة (Authority Manager)
+    if ($user->role?->level === 1) { 
         $query->where('authority_id', $user->authority_id)
               ->where('assigned_level', 1);
     } 
-    elseif ($user->role?->level === 2) { // مدير القسم (Department Manager)
-        // تعديل: يرى كل شكاوى قسمه بغض النظر عن المستوى الإداري للشكوى
+    elseif ($user->role?->level === 2) { 
         $query->where('department_id', $user->department_id);
     } 
-    elseif ($user->role?->level === 3) { // الموظف (Employee)
+    elseif ($user->role?->level === 3) { 
         $query->where('department_id', $user->department_id)
               ->where('assigned_level', 3);
     } 
-    else { // المواطن (Citizen)
+    else { 
         $query->where('user_id', $user->id);
     }
 
     $complaints = $query->orderBy('created_at', 'desc')->get();
 
-    // 3. إضافة الحقول الوهمية ومعالجة البيانات للعرض
     $complaints->transform(function ($complaint) use ($user, $now) {
         $complaint->can_chat = false;
 
-        // منطق الشات:
-        // 1. مدير القسم يمكنه الشات في أي شكوى داخل قسمه لم تُحل بعد
+        // chat logic
         if ($user->role?->level === 2 && $complaint->status !== 'Resolved') {
             $complaint->can_chat = true;
         }
-        // 2. المستويات الأخرى (موظف، مدير عام) تشات فقط إذا كانت الشكوى في مستواهم حالياً
         elseif ($user->role?->level == $complaint->assigned_level) {
             $complaint->can_chat = true;
         }
-        // 3. المواطن دائماً يمكنه الشات في شكاويه
         elseif ($user->role?->level === 4 || !$user->role) {
             $complaint->can_chat = true;
         }
 
-        // تحديد مسمى المستوى الإداري الحالي للشكوى
         $complaint->current_level_name = match((int)$complaint->assigned_level) {
             1 => 'Authority Manager',
             2 => 'Department Manager',
@@ -145,33 +129,27 @@ class ComplaintController extends Controller
             default => 'Unknown'
         };
 
-        // إضافة حقل للوقت المنقضي بشكل نصي (اختياري للفرونت إند)
         $complaint->created_at_human = $complaint->created_at ? $complaint->created_at->diffForHumans() : 'منذ فترة غير محددة';
 
         return $complaint;
     });
 
-    // 4. إرجاع الرد النهائي
     return response()->json([
         'success' => true,
         'count'   => $complaints->count(),
         'data'    => $complaints
     ], 200);
 }
-    /**
-     * عرض تفاصيل شكوى واحدة محددة للمستخدم
-     */
+
     public function show($id): JsonResponse
 {
     $user = auth()->user();
 
-    // 1. جلب الشكوى (بالآيدي أو بالرقم)
     $complain = \App\Models\Complain::with(['user', 'authority', 'department', 'attachments', 'chat.messages.sender'])
         ->where('id', $id)
         ->orWhere('complain_number', $id) 
         ->first();
 
-    // 2. التحقق من وجود الشكوى
     if (!$complain) {
         return response()->json([
             'success' => false,
@@ -190,7 +168,6 @@ class ComplaintController extends Controller
         ], 403);
     }
 
-    // 4. التحقق من صلاحيات الموظفين (الوزارة والمستوى الإداري)
     if (in_array($user->role?->level, [1, 2, 3])) {
         if ($complain->authority_id !== $user->authority_id) {
             return response()->json([
@@ -199,7 +176,6 @@ class ComplaintController extends Controller
             ], 403);
         }
 
-        // ب. منع الموظف من رؤية شكوى مصعدة لمستوى أعلى منه
         if ($complain->assigned_level > $user->role->level) {
             return response()->json([
                 'success' => false,
@@ -208,7 +184,6 @@ class ComplaintController extends Controller
         }
     }
 
-    // 5. إنشاء رسالة الحالة المخصصة (وضعناها هنا لتكون جاهزة للرد)
     $statusMessage = match($complain->status) {
         'Resolved'    => 'شكراً لثقتك في تطبيقنا، تمت معالجة الشكوى بنجاح.',
         'Rejected'    => 'تم الاعتذار عن معالجة الشكوى. السبب: ' . ($complain->admin_reply ?? 'لم يتم ذكر سبب'),
@@ -239,17 +214,15 @@ class ComplaintController extends Controller
         'chat.messages.sender'
     ]);
 
-    // 7. الرد النهائي مع الرسالة
     return response()->json([
         'success' => true,
-        'status_message' => $statusMessage, // هذه هي الرسالة التي طلبتِها
+        'status_message' => $statusMessage, 
         'data'    => $complain
     ]);
 }
 
-    /**
-     * تقييم المستخدم للجهة بعد حل الشكوى
-     */
+    
+
     public function rateAuthority(Request $request, Complain $complain): JsonResponse
     {
         $request->validate([
@@ -295,7 +268,6 @@ class ComplaintController extends Controller
      */
     public function updateStatus(Request $request, $id): JsonResponse
 {
-    // 1. التحقق من المدخلات (ملاحظات الرفض إجبارية)
     $request->validate([
         'status' => 'required|string|in:Pending,In Progress,Resolved,Rejected',
         'notes'  => 'required_if:status,Rejected|string|max:500' 
@@ -307,7 +279,7 @@ class ComplaintController extends Controller
     $nextStatus = $request->input('status');
     $notes = $request->input('notes');
 
-    //(Security Gate) +
+    //(Security Gate) 
     if (!$user->isAdmin()) {
         if ($complain->department_id != $user->department_id) {
             return response()->json([
@@ -317,7 +289,6 @@ class ComplaintController extends Controller
         }
     }
 
-    // 3. التحقق من "منطق الانتقال" (State Machine Logic)
     $allowedNextStatuses = Complain::STATUS_TRANSITIONS[$oldStatus] ?? [];
     if (!in_array($nextStatus, $allowedNextStatuses)) {
         return response()->json([
@@ -347,17 +318,15 @@ class ComplaintController extends Controller
 
     $complain->save();
 
-    // 5. إرسال الإشعارات
     $this->sendStatusNotification($complain, $nextStatus, $oldStatus, $notes);
 
     return response()->json([
         'success' => true,
         'message' => 'تم تحديث الحالة بنجاح وإرسال التنبيهات اللازمة.',
-        'data' => $complain->refresh()->load('user') // قمنا بإضافة refresh لضمان ظهور الـ notes والبيانات الجديدة
+        'data' => $complain->refresh()->load('user') 
     ]);
 }
-/**
- */
+
 private function sendStatusNotification($complain, $nextStatus, $oldStatus, $notes = null) 
 {
     if (!$complain->user) return;
@@ -407,7 +376,6 @@ public function escalate(Request $request, $id)
 
     $user = auth()->user();
 
-    // 1. التحقق من الصلاحية: (الموظف ليفل 1، أو مدير القسم ليفل 2، أو الأدمن ليفل 0)
     if (!in_array($user->role?->level, [0, 1, 2])) {
         return response()->json([
             'success' => false,
@@ -415,15 +383,13 @@ public function escalate(Request $request, $id)
         ], 403);
     }
 
-    // 2. التحقق من البيانات المرسلة (نتوقع رقم المستوى المستهدف)
     $request->validate([
-        'target_level' => 'required|in:1,2' // 1 لمدير الجهة، 2 لمدير القسم
+        'target_level' => 'required|in:1,2' 
     ]);
 
     $targetLevel = $request->target_level;
 
   
-    // لا يمكن للموظف تصعيد شكوى لمستوى أقل من مستواها الحالي
     if ($targetLevel >= $complaint->assigned_level && $user->role?->level != 0) {
         return response()->json([
             'success' => false,
@@ -454,7 +420,6 @@ public function getComplaintsByStatus(Request $request, $status): JsonResponse
     $user = $request->user();
 
 
-    // التأكد أن الحالة المرسلة صحيحة
     $validStatuses = ['Pending', 'In Progress', 'Resolved', 'Rejected'];
     if (!in_array($status, $validStatuses)) {
         return response()->json(['success' => false, 'message' => 'حالة غير صالحة'], 400);
@@ -464,9 +429,8 @@ public function getComplaintsByStatus(Request $request, $status): JsonResponse
     $query = \App\Models\Complain::where('status', $status)
                                  ->with(['user:id,name', 'department', 'authority']);
 
-    // نظام الحماية (Security Gate): كل شخص يرى فقط ما يخصه
+    // كل شخص يرى فقط ما يخصه
     if (!$user->isAdmin()) {
-        // جلب المستوى الإداري للمستخدم من علاقة الـ role
         $userLevel = $user->role ? (int)$user->role->level : null;
 
         if ($userLevel === 1) {
@@ -490,19 +454,18 @@ public function getComplaintsByStatus(Request $request, $status): JsonResponse
         'data' => $complaints
     ], 200);
 }
-/**
- * دالة الرد على الشكوى وتحديث النقاط وإرسال إشعار لحظي
- */
-public function respond(Request $request, $id) 
+
+
+function respond(Request $request, $id) 
 {
     $complaint = \App\Models\Complain::findOrFail($id);
     $admin = $request->user();
 
-    // القفل الإداري الصارم
+  
     $adminLevel = (int)$admin->role->level; // المستوى من جدول الأدوار
     $complaintLevel = (int)$complaint->assigned_level; // مستوى الشكوى الحالي
 
-    // إذا كان مستوى الشخص (2) أكبر من مستوى الشكوى (1) -> ارفض
+    
     if ($adminLevel > $complaintLevel) {
         return response()->json([
             'success' => false,
@@ -510,7 +473,6 @@ public function respond(Request $request, $id)
         ], 403);
     }
 
-    // شرط إضافي: إذا كانت الشكوى لمدير الجامعة (1) والمستخدم ليس أدمن (0) ولا مدير عام (1)
     if ($complaintLevel === 1 && $adminLevel > 1) {
         return response()->json([
             'success' => false,
@@ -518,7 +480,6 @@ public function respond(Request $request, $id)
         ], 403);
     }
 
-    // بقية الكود كما هو...
     $request->validate([
         'reply' => 'required|string|min:5|max:1000',
         'status' => 'required|in:Resolved,Rejected',
@@ -532,8 +493,7 @@ public function respond(Request $request, $id)
         'processed_by' => $admin->id 
     ]);
     
-    // ... باقي كود الإشعارات والنقاط ..
-        // 5. تحميل العلاقات وإرسال الإشعارات
+   
     $complaint->load('processor.role');
     $citizen = $complaint->user;
     $citizen->adjustScoreByValidity($request->is_valid);
@@ -554,12 +514,11 @@ public function respond(Request $request, $id)
     ]);
 }
 /**
- * دالة جلب شكاوى المستخدم المسجل (هذه هي الدالة الناقصة)
+ * دالة جلب شكاوى المستخدم المسجل
  */
 public function userComplaints(Request $request): JsonResponse
 {
     $user = $request->user();
-    // جلب الشكاوى الخاصة بالمستخدم فقط
     $complaints = \App\Models\Complain::with(['authority', 'department'])
         ->where('user_id', $user->id)
         ->orderBy('created_at', 'desc')
