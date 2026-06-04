@@ -18,8 +18,7 @@ class RatingController extends Controller
    /**
      * إرسال تقييم الطالب للجهة بعد حل الشكوى (نسخة متوافقة بدون تعديل حقول جدول authorities)
      */
-    public function submitRating(Request $request, $complainId): JsonResponse
-    {
+    public function submitRating(Request $request, $complainId): JsonResponse    {
         // 1. جلب الشكوى للتأكد من وجودها في قاعدة البيانات
         $complain = Complain::findOrFail($complainId);
 
@@ -61,18 +60,18 @@ class RatingController extends Controller
 
         // استخدام الـ Database Transaction لضمان الحفظ المترابط والأمان العالي
         return DB::transaction(function () use ($request, $complain, $complainId) {
-            
-            // تحديد الحقل البرمجي للجهة
+        
             $authorityId = $complain->authority_id ?? $complain->auth_id;
-
-            // 6. إدخال التقييم رسمياً في جدول rattings
+    
+            // 3. الحفظ
             $rating = Rating::create([
-                'complain_id'          => $complainId,
+                'complain_id'          => $complainId, 
                 'user_id'              => $request->user()->id,
                 'authority_id'         => $authorityId,
                 'response_speed_score' => $request->response_speed_score,
                 'comment'              => $request->comment,
             ]);
+            \Log::info("Saved Rating ID: " . $rating->id . " for Complain ID: " . $rating->complain_id);
 
             // جلب الجهة لحساب المعدلات ديناميكياً بدون التحديث المباشر للجدول
             $authority = Authority::find($authorityId);
