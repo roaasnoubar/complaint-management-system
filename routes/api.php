@@ -123,7 +123,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])
     // --- حساب المستخدم ---
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
-        Route::get('me', [AuthController::class, 'me']);
+        Route::get('/auth/me', [AuthController::class, 'me']);
     });
 
     // --- 1. الأدمن العام (Super Admin) ---
