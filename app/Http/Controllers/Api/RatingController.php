@@ -67,7 +67,8 @@ class RatingController extends Controller
             $rating = Rating::create([
                 'complain_id'          => $complainId, 
                 'user_id'              => $request->user()->id,
-                'authority_id'         => $authorityId,
+                'auth_id'              => $authorityId,
+                'rating'               => $request->response_speed_score, // هنا التعديل! ربطنا القيمة بالعمود
                 'response_speed_score' => $request->response_speed_score,
                 'comment'              => $request->comment,
             ]);
@@ -101,7 +102,7 @@ class RatingController extends Controller
 
         // جلب التقييمات مرتبة من الأحدث للأقدم مع بيانات الطالب والشكوى المرتبطة بها (Pagination)
         $ratings = Rating::with(['user', 'complain'])
-                           ->where('authority_id', $authorityId)
+        ->where('auth_id', $authorityId)
                            ->latest()
                            ->paginate(10);
 
@@ -114,11 +115,11 @@ class RatingController extends Controller
                     'average_rating'  => $authority->average_rating ?? 0.0,
                     'total_ratings'   => $authority->total_ratings ?? 0,
                     'score_breakdown' => [
-                        '5_stars' => Rating::where('authority_id', $authorityId)->where('response_speed_score', 5)->count(),
-                        '4_stars' => Rating::where('authority_id', $authorityId)->where('response_speed_score', 4)->count(),
-                        '3_stars' => Rating::where('authority_id', $authorityId)->where('response_speed_score', 3)->count(),
-                        '2_stars' => Rating::where('authority_id', $authorityId)->where('response_speed_score', 2)->count(),
-                        '1_star'  => Rating::where('authority_id', $authorityId)->where('response_speed_score', 1)->count(),
+                        '5_stars' => Rating::where('auth_id', $authorityId)->where('response_speed_score', 5)->count(),
+                        '4_stars' => Rating::where('auth_id', $authorityId)->where('response_speed_score', 4)->count(),
+                        '3_stars' => Rating::where('auth_id', $authorityId)->where('response_speed_score', 3)->count(),
+                        '2_stars' => Rating::where('auth_id', $authorityId)->where('response_speed_score', 2)->count(),
+                        '1_star'  => Rating::where('auth_id', $authorityId)->where('response_speed_score', 1)->count(),
                     ],
                 ],
                 'ratings' => $ratings,

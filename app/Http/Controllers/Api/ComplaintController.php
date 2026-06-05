@@ -65,7 +65,6 @@ class ComplaintController extends Controller
     
     public function index(Request $request): JsonResponse
 {
-    return response()->json(['debug_message' => 'Controller reached successfully!'], 200);
     $user = $request->user();
     $now = \Carbon\Carbon::now();
 
@@ -220,9 +219,6 @@ class ComplaintController extends Controller
         'data'    => $complain
     ]);
 }
-
-    
-
     public function rateAuthority(Request $request, Complain $complain): JsonResponse
     {
         $request->validate([
@@ -315,7 +311,6 @@ class ComplaintController extends Controller
     if ($notes) {
         $complain->notes = $notes; 
     }
-
     $complain->save();
 
     $this->sendStatusNotification($complain, $nextStatus, $oldStatus, $notes);
@@ -326,7 +321,6 @@ class ComplaintController extends Controller
         'data' => $complain->refresh()->load('user') 
     ]);
 }
-
 private function sendStatusNotification($complain, $nextStatus, $oldStatus, $notes = null) 
 {
     if (!$complain->user) return;

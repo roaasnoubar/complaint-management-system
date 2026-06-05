@@ -43,10 +43,7 @@ return response()->json([
     'success' => false,
     'message' => 'Unauthorized access.',
     'debug' => [
-        'user_id' => $user->id,
-        'user_role_name_in_db' => $userRoleName,
-        'user_level_in_db' => $userLevel,
-        'roles_required_by_route' => $roles
+        'message' => 'عذراً، ليس لديك الصلاحية للقيام بهذا الإجراء.'
     ]
 ], 403);
 }

@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class EmployeeComplaintController extends Controller
 {
-    
+    //لضمان التحديث اللحظي للشكاوى عند دخول الموظف للنظام
     public function getComplaints(Request $request): JsonResponse
 {
     $now = now();
@@ -35,7 +35,7 @@ $employee = $request->user();
         if (!$employee->isEmployee() && !$employee->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
-//users.score
+        //users.score
         $query = Complain::query()
             ->with(['user', 'authority', 'department', 'attachments'])
             ->select('complains.*')

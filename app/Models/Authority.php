@@ -35,7 +35,7 @@ class Authority extends Model
 
     public function ratings(): HasMany
     {
-        return $this->hasMany(Rating::class, 'authority_id');
+        return $this->hasMany(Rating::class, 'auth_id');
     }
 
     public function getAverageRatingAttribute(): float

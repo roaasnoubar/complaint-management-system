@@ -8,15 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Rating extends Model
 {
     // ⚠️ التعديل السحري هنا: إضافة حرف t ليطابق اسم جدولكِ الحقيقي في قاعدة البيانات
-    protected $table = 'rattings'; 
+    protected $table = 'ratings'; 
 
     // الحقول المسموح بتعبئتها بأمان
     protected $fillable = [
         'complain_id',
-        'user_id',
-        'authority_id',
-        'response_speed_score',
-        'comment',
+    'user_id',
+    'auth_id',
+    'response_speed_score',
+    'rating', // أضيفي هذا السطر
+    'comment',
     ];
 
     // تحويل أنواع البيانات تلقائياً لمنع أخطاء السلسلة النصية
@@ -45,6 +46,6 @@ class Rating extends Model
      */
     public function authority(): BelongsTo
     {
-        return $this->belongsTo(Authority::class, 'authority_id');
+        return $this->belongsTo(Authority::class, 'auth_id');
     }
 }

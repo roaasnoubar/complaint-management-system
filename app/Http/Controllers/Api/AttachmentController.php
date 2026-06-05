@@ -43,12 +43,26 @@ class AttachmentController extends Controller
      */
     public function destroy(Attachment $attachment): JsonResponse
     {
-        Storage::disk('public')->delete($attachment->file_path);
+        // 1. التحقق من الصلاحيات: هل المستخدم هو صاحب الملف أو مدير؟
+        // نفترض أن لديك دالة isAdmin() داخل الـ User Model
+        if ($attachment->user_id !== auth()->id() && !auth()->user()->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'غير مصرح لك بحذف هذا الملف.'
+            ], 403);
+        }
+    
+        // 2. التحقق من وجود الملف قبل محاولة حذفه
+        if (Storage::disk('public')->exists($attachment->file_path)) {
+            Storage::disk('public')->delete($attachment->file_path);
+        }
+    
+        // 3. حذف السجل من قاعدة البيانات
         $attachment->delete();
-
+    
         return response()->json([
             'success' => true,
-            'message' => 'Attachment deleted successfully.'
+            'message' => 'تم حذف المرفق بنجاح.'
         ], 200);
     }
 }
