@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 class AttachmentController extends Controller
 {
     /**
-     * تخزين مرفق جديد لشكوى موجودة
+     * storage
      */
     public function store(Request $request): JsonResponse
     {
@@ -22,14 +22,13 @@ class AttachmentController extends Controller
         ]);
 
         $file = $request->file('file');
-        // تخزين في مجلد Complain
         $path = $file->store('attachments/' . $validated['complain_id'], 'public');
 
         $attachment = Attachment::create([
-            'user_id' => auth()->id() ?? $request->user_id, // دعم الـ API
+            'user_id' => auth()->id() ?? $request->user_id, 
             'complain_id' => $validated['complain_id'],
             'file_path' => $path,
-            'file_type' => $file->getClientOriginalExtension(), // تخزين اللاحقة (pdf, png...)
+            'file_type' => $file->getClientOriginalExtension(), //(pdf, png...)
         ]);
 
         return response()->json([

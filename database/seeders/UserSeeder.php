@@ -154,14 +154,10 @@ class UserSeeder extends Seeder
         ];
 
         foreach ($users as $userData) {
-            // الفحص المزدوج الآمن: التأكد أن الإيميل واليوزرنيم غير محجوزين مطلقاً قبل الإنشاء
-            $exists = User::where('email', $userData['email'])
-                          ->orWhere('username', $userData['username'])
-                          ->exists();
-
-            if (!$exists) {
-                User::create($userData);
-            }
+            User::updateOrCreate(
+                ['email' => $userData['email']], 
+                $userData
+            );
         }
     }
 }

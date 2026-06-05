@@ -124,21 +124,35 @@ class ComplaintProcessingController extends Controller
     }
     
     public function reject(Request $request, $id)
-    {
-        // 1. استخدمي واجهة الـ DB مباشرة مع استعلام نصي (Raw Query)
-        // هذا لا يعتمد على الموديل ولا على الكاش
-        $result = \DB::statement("UPDATE complains SET status = 'Rejected', notes = ? WHERE id = ?", [
-            $request->rejection_reason ?? 'لا يوجد سبب',
-            $id
-        ]);
-    
-        // 2. إذا نجح التحديث سيعود بقيمة true
-        if ($result) {
-            return response()->json(['message' => 'تم الرفض بنجاح']);
+{
+    // 1. تنفيذ التحديث
+    $result = \DB::statement("UPDATE complains SET status = 'Rejected', notes = ? WHERE id = ?", [
+        $request->rejection_reason ?? 'لا يوجد سبب',
+        $id
+    ]);
+
+    if ($result) {
+        // 2. جلب الشكوى (للحصول على user_id الخاص بصاحب الشكوى)
+        $complain = \DB::table('complains')->where('id', $id)->first();
+
+        // 3. إنشاء الإشعار يدوياً
+        if ($complain) {
+            \DB::table('notifications')->insert([
+                'user_id'    => $complain->user_id, // صاحب الشكوى
+                'title'      => 'تم رفض الشكوى',
+                'message'    => 'تم رفض شكواك رقم ' . $id . ' للأسباب التالية: ' . ($request->rejection_reason ?? 'لا يوجد سبب'),
+                'is_read'    => false,
+                'type'       => 'reject',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
-    
-        return response()->json(['message' => 'فشل التحديث'], 500);
+
+        return response()->json(['message' => 'تم الرفض بنجاح وتم إرسال إشعار للمستخدم']);
     }
+
+    return response()->json(['message' => 'فشل التحديث'], 500);
+}
      /*public function reject(Request $request, $id): JsonResponse
     {
         
