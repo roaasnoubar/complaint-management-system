@@ -111,34 +111,36 @@ class ComplaintProcessingController extends Controller
     }
     
     public function reject(Request $request, $id)
-{
-    // 1. تنفيذ التحديث
-    $result = \DB::statement("UPDATE complains SET status = 'Rejected', notes = ? WHERE id = ?", [
-        $request->rejection_reason ?? 'لا يوجد سبب',
-        $id
-    ]);
-
-    if ($result) {
-        $complain = \DB::table('complains')->where('id', $id)->first();
-
-        if ($complain) {
-            \DB::table('notifications')->insert([
-                'user_id'    => $complain->user_id, // صاحب الشكوى
-                'title'      => 'تم رفض الشكوى',
-                'message'    => 'تم رفض شكواك رقم ' . $id . ' للأسباب التالية: ' . ($request->rejection_reason ?? 'لا يوجد سبب'),
-                'is_read'    => false,
-                'type'       => 'reject',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
+    {
+        // 1. تحديث الشكوى (بإمكانك استخدام Eloquent بدلاً من DB::statement ليكون الكود أنظف)
+        $complain = \App\Models\Complain::find($id);
+        if (!$complain) return response()->json(['message' => 'الشكوى غير موجودة'], 404);
+    
+        $complain->update([
+            'status' => 'Rejected',
+            'notes' => $request->rejection_reason ?? 'لا يوجد سبب'
+        ]);
+    
+        // 2. إنشاء الإشعار باستخدام الموديل (بدل DB::table)
+        $notification = \App\Models\Notification::create([
+            'user_id'    => $complain->user_id,
+            'title'      => 'تم رفض الشكوى',
+            'message'    => 'تم رفض شكواك رقم ' . $id . ' للأسباب التالية: ' . ($request->rejection_reason ?? 'لا يوجد سبب'),
+            'is_read'    => false,
+            'type'       => 'reject',
+        ]);
+    
+        // 3. الخطوة السحرية: إطلاق الحدث يدوياً لكي يصل الإشعار للموبايل فوراً
+        event(new \App\Events\NotificationSent($notification));
+    
         return response()->json(['message' => 'تم الرفض بنجاح وتم إرسال إشعار للمستخدم']);
-    }
-
-    return response()->json(['message' => 'فشل التحديث'], 500);
+        $authority = \App\Models\Authority::find($complain->auth_id); // أو $complain->auth_id حسب عمودك
+if ($authority) {
+    // خصم 10 نقاط مثلاً من السكور الإجمالي أو المتوسط
+    $authority->decrement('total_score', 10); 
+    // ملاحظة: تأكدي من اسم العمود في جدول authorities
 }
-
+    }
     /**
      * دالة التصعيد اليدوي: تنقل الشكوى للمستوى الإداري الأعلى (تعديل التدرج: من 1 إلى 2 ومن 2 إلى 3).
      */
@@ -194,7 +196,6 @@ class ComplaintProcessingController extends Controller
             'user', 'authority', 'department', 'attachments', 'chat.messages.sender'
         ])->findOrFail($id);
 
-        // الصلاحيات
         if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
@@ -226,7 +227,6 @@ class ComplaintProcessingController extends Controller
         ], 200);
     }
 
-    // --- دالات مساعدة (Private Helpers) لضمان نظافة الكود ---
 
     private function calculatePriority($score): string
     {
