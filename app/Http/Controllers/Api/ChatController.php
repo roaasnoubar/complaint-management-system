@@ -13,16 +13,13 @@ use Illuminate\Support\Facades\Storage;
 
 class ChatController extends Controller
 {
-    /**
-     * 1. جلب المحادثة ورسائلها (للطالب أو الموظف المخول)
-     */
+    
     public function getChat(Request $request, $complainId): JsonResponse
     {
         // جلب الشكوى أو إعطاء خطأ 
         $complain = Complain::findOrFail($complainId);
         $user = auth()->user();
 
-        // التأكد من أن المستخدم مخول (صاحب الشكوى أو موظف ضمن الصلاحية الزمنية)
         if (!$complain->canAccessChat($user) && $user->id !== $complain->user_id) {
             return response()->json([
                 'success' => false, 
@@ -30,7 +27,6 @@ class ChatController extends Controller
             ], 403);
         }
 
-        // جلب المحادثة مع الرسائل وبيانات المرسلين
         $chat = ComplainChat::with(['messages.sender:id,name'])
                             ->where('complain_id', $complainId)
                             ->first();
@@ -47,23 +43,19 @@ class ChatController extends Controller
                 'is_open'     => $chat->is_open,
                 'can_send'    => $complain->canAccessChat($user),
                 
-                // --- السطر الجديد والمختصر باستخدام الـ Resource ---
                 'messages'    => ChatMessageResource::collection($chat->messages),
-                // --------------------------------------------------
             ],
         ], 200);
     }
 
-    /**
-     * 2. إرسال رسالة جديدة (نص + ملفات)
-     */
+
+
     public function sendMessage(Request $request, $complainId): JsonResponse
     {
         $complain = Complain::findOrFail($complainId);
         $user = $request->user();
         $chat = ComplainChat::where('complain_id', $complainId)->first();
 
-        // أ. التحقق من وجود الشات وأنه مفتوح
         if (!$chat || !$chat->is_open) {
             return response()->json(['success' => false, 'message' => 'المحادثة مغلقة ولا يمكن الإرسال.'], 422);
         }
@@ -75,13 +67,12 @@ class ChatController extends Controller
             ], 403);
         }
 
-        // ج. التحقق من مدخلات الأندرويد
         $request->validate([
             'message' => 'nullable|string|required_without:file',
-            'file'    => 'nullable|file|mimes:jpg,jpeg,png,pdf,docx|max:10240', // حد أقصى 10 ميجا
+            'file'    => 'nullable|file|mimes:jpg,jpeg,png,pdf,docx|max:10240', //  10 ميجا
         ]);
 
-        // د. معالجة رفع الملف (إن وجد)
+       
         $filePath = null; 
         $fileType = null;
         if ($request->hasFile('file')) {
@@ -113,16 +104,14 @@ class ChatController extends Controller
         ], 201);
     }
 
-    /**
-     * 3. جلب جميع المحادثات (للمدير العام لرؤية النشاط)
-     */
-    // جلب كل المحادثات (للموظفين والمدراء فقط)
+    
 public function getAllChats(Request $request): JsonResponse
 {
     $user = auth()->user();
 
-    // منع المستخدم العادي من رؤية كل المحادثات
-    if ($user->role_id == 3) {
+ 
+
+    if (!in_array($user->role_id, [1, 2])) {
         return response()->json(['success' => false, 'message' => 'غير مصرح لك'], 403);
     }
 
@@ -165,7 +154,7 @@ public function markAsRead($complainId)
 {
     $user = auth()->user();
 
-    // تحديث كافة الرسائل المرسلة من الطرف الآخر لتصبح "مقروءة"
+  
     \App\Models\ChatMessage::whereHas('chat', function ($query) use ($complainId) {
         $query->where('complain_id', $complainId);
     })

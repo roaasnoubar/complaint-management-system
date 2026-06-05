@@ -9,7 +9,7 @@ use Illuminate\Http\JsonResponse;
 class DashboardController extends Controller
 {
     /**
-     * 1. الإحصائيات العامة (إجمالي الشكاوى حسب الحالة)
+     * 1. الإحصائيات العامة 
      */
     public function getStatistics(): JsonResponse
     {
@@ -34,7 +34,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * 2. الشكاوى حسب الهيئة (Authorities)
+     * (Authorities)
      */
     public function complaintsByAuthority(): JsonResponse
     {
@@ -50,9 +50,9 @@ class DashboardController extends Controller
         ]);
     }
 
-    /**
-     * 3. الشكاوى حسب القسم 
-     */
+
+
+
     public function complaintsByDepartment(): JsonResponse
     {
         $data = DB::table('departments')
@@ -68,9 +68,8 @@ class DashboardController extends Controller
         ]);
     }
 
-    /**
-     * 4. الإحصائيات الشهرية (آخر 6 أشهر)
-     */
+    
+    
     public function monthlyComplaints(): JsonResponse
     {
         $data = DB::table('complains')

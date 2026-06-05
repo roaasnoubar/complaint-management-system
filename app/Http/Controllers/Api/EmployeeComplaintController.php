@@ -9,25 +9,20 @@ use Illuminate\Http\Request;
 
 class EmployeeComplaintController extends Controller
 {
-    /**
-     * 1. عرض قائمة الشكاوى (Index)
-     */
+    
     public function getComplaints(Request $request): JsonResponse
 {
     $now = now();
 
-    // 1. تصعيد لمدير الجهة (Level 1)
-    // الشرط: عند مدير القسم (2) + مر عليها دقيقة + لم تُفتح (أو لم تُحل)
+    
     \App\Models\Complain::where('assigned_level', 2)
         ->where('updated_at', '<=', $now->copy()->subMinute()) // مر دقيقة على وصولها للمدير
-        ->where('status', '=', 'Pending') // نفترض أن Pending تعني لم تفتح/تبدأ المعالجة
+        ->where('status', '=', 'Pending') 
         ->update([
             'assigned_level' => 1,
             'updated_at' => $now
         ]);
 
-    // 2. تصعيد لمدير القسم (Level 2)
-    // الشرط: عند الموظف (3) + مر عليها دقيقة + لم تُفتح
     \App\Models\Complain::where('assigned_level', 3)
         ->where('created_at', '<=', $now->copy()->subMinute())
         ->where('status', '=', 'Pending')
@@ -36,12 +31,11 @@ class EmployeeComplaintController extends Controller
             'updated_at' => $now
         ]);
 
-// 2. تكملة الكود الخاص بكِ
 $employee = $request->user();
         if (!$employee->isEmployee() && !$employee->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
-
+//users.score
         $query = Complain::query()
             ->with(['user', 'authority', 'department', 'attachments'])
             ->select('complains.*')

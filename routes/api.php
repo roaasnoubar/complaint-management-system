@@ -173,6 +173,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])
             Route::get('/all', [ChatController::class, 'getAllChats']);
             Route::post('/open/{complainId}', [ChatController::class, 'openChat']);
             Route::post('/read/{complainId}', [ComplainChatController::class, 'markAsRead']); 
+            Route::get('/all', [ChatController::class, 'getAllChats']);
         });
 
         // --- 6. الإحصائيات (Dashboard) ---

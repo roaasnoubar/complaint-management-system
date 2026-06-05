@@ -14,28 +14,22 @@ use Illuminate\Support\Facades\Log;
 
 class ComplaintProcessingController extends Controller
 {
-    /**
-     * تحديث حالة الشكوى (استلام، حل) مع تحديث نقاط المصداقية وتوقيت التعيين.
-     */
+   
     public function acceptAsValid($id): JsonResponse
     {
         $complaint = Complain::findOrFail($id);
         
-        // تحديث حالة الشكوى وتوثيق وقت الحل لمنع المشاكل الإحصائية
         $complaint->update([
             'status' => Complain::STATUS_RESOLVED,
             'resolved_at' => now(),
         ]);
 
-        // جلب الطالب صاحب الشكوى عبر العلاقة المحددة في الموديل
         $student = $complaint->user; 
         
         if ($student) {
-            // رفع السكور الخاص بالطالب بمقدار 10 نقاط كمكافأة على جديته
             $student->increment('score', 10); 
         }
 
-        // إرسال إشعار عبر الإيميل بالطريقة النظامية
         $this->sendStatusEmail($complaint, Complain::STATUS_RESOLVED);
 
         return response()->json([
@@ -58,7 +52,6 @@ class ComplaintProcessingController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
         }
 
-        // 2. التحقق من الهرمية (تعديل الإشارة: يمنع لو صلاحية المستخدم أقل من مستوى الشكوى الحالي)
         if (!$user->isAdmin() && intval($user->role->level) < intval($complain->level)) {
             return response()->json([
                 'success' => false, 
@@ -66,7 +59,6 @@ class ComplaintProcessingController extends Controller
             ], 403);
         }
 
-        // 3. التحقق من التبعية (للموظف ومدير القسم لضمان بقائهم ضمن قسمهم فقط)
         if ($user->isEmployee() || $user->isDeptManager()) {
             if (intval($complain->department_id) !== intval($user->department_id)) {
                 return response()->json(['success' => false, 'message' => 'هذه الشكوى لا تتبع لقسمك.'], 403);
@@ -86,18 +78,14 @@ class ComplaintProcessingController extends Controller
         $nextStatusValue = is_array($allowedNextStatus) ? $allowedNextStatus[0] : $allowedNextStatus;
         $previousStatus  = $complain->status;
 
-        // 5. تنفيذ التعديلات
         $complain->status = $nextStatusValue;
         
-        // توثيق رتبة المعالج الحالي (من التوكين)
         $complain->assigned_level = $user->role->level; 
 
-        // إذا تحولت الحالة إلى "قيد المعالجة"
         if ($nextStatusValue === Complain::STATUS_IN_PROGRESS) {
             $complain->assigned_at = now(); 
         }
 
-        // إذا تحولت الحالة إلى "تم الحل" عبر التدفق الطبيعي
         if ($nextStatusValue === Complain::STATUS_RESOLVED) {
             $complain->resolved_at = now();
             if ($complain->user) {
@@ -107,7 +95,6 @@ class ComplaintProcessingController extends Controller
 
         $complain->save();
 
-        // إرسال الإشعار للمستخدم
         $this->sendStatusEmail($complain, $nextStatusValue);
         
         return response()->json([
@@ -132,10 +119,8 @@ class ComplaintProcessingController extends Controller
     ]);
 
     if ($result) {
-        // 2. جلب الشكوى (للحصول على user_id الخاص بصاحب الشكوى)
         $complain = \DB::table('complains')->where('id', $id)->first();
 
-        // 3. إنشاء الإشعار يدوياً
         if ($complain) {
             \DB::table('notifications')->insert([
                 'user_id'    => $complain->user_id, // صاحب الشكوى
@@ -153,95 +138,7 @@ class ComplaintProcessingController extends Controller
 
     return response()->json(['message' => 'فشل التحديث'], 500);
 }
-     /*public function reject(Request $request, $id): JsonResponse
-    {
-        
-        /*
-        $user = $request->user(); 
-        $complain = Complain::with('user')->findOrFail($id);
-    
-        // 1. تحديد مستوى الرفض بناءً على دور المستخدم (تعديل الأرقام: الموظف 1، مدير القسم 2، مدير الجهة 3)
-        $rejectionLevel = match(true) {
-            $user->isEmployee() => 1,         
-            $user->isDeptManager() => 2,      
-            $user->isAuthorityManager() => 3, 
-            $user->isAdmin() => 3,            
-            default => null
-        };
-    
-        if ($rejectionLevel === null) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized role.'], 403);
-        }
-    
-        // 2. التحقق من التبعية (القسم أو الجهة) لضمان الصلاحية الإقليمية
-        if (!$user->isAdmin()) {
-            if ($rejectionLevel <= 2) { // تعديل الإشارة لتشمل الموظف ومدير القسم
-                if (intval($complain->department_id) !== intval($user->department_id)) {
-                    return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
-                }
-            } else { 
-                if (intval($complain->authority_id) !== intval($user->authority_id)) {
-                    return response()->json(['success' => false, 'message' => 'Not authorized for this authority.'], 403);
-                }
-            }
-        }
-    
-        // 3. التحقق من إدخال سبب الرفض وجوباً
-        $request->validate([
-            'rejection_reason' => 'required|string|min:5',
-        ]);
-    
-        $student = $complain->user;
-        $isBanned = false;
 
-        // 4. تنفيذ نظام العقوبات التلقائي (السكور والحظر التلقائي)
-        if ($student) {
-            // أ. خفض السكور بمقدار 10 نقاط
-            $student->decrement('score', 10); 
-            
-            // ب. زيادة عداد الشكاوى الكاذبة
-            $student->increment('false_complaints_count');
-
-            // ج. شرط الطرد والحظر الحاسم (3 شكاوى كاذبة)
-            if ($student->false_complaints_count >= 3) {
-                $student->update(['is_banned' => true]);
-                $student->tokens()->delete(); // طرد فوري وسحب توكنات الفلاتر
-                $isBanned = true;
-            }
-        }
-    
-        // 5. تحديث الشكوى وحفظ سبب الرفض في حقل الـ notes
-        $complain->update([
-            'status' => 'Rejected',
-            'notes' => $request->rejection_reason,
-            'assigned_level' => $rejectionLevel, 
-        ]);
-    
-        // إرسال إيميل بالرفض
-        $this->sendStatusEmail($complain, 'Rejected');
-    
-        if ($isBanned) {
-            return response()->json([
-                'success' => true,
-                'status' => 'banned',
-                'message' => "تم رفض الشكوى ككاذبة من قبل {$user->name}. تم حظر الطالب نهائياً من النظام وتدمير الجلسة لتجاوزه 3 شكاوى كاذبة."
-            ], 200);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => "تم رفض الشكوى ككاذبة بنجاح من قبل " . $user->name . " وخصم النقاط من الطالب.",
-            'data' => [
-                'id'             => $complain->id,
-                'status'         => $complain->status,
-                'assigned_level' => $complain->assigned_level,
-                'user_new_score' => $student ? $student->score : null,
-                'notes'          => $complain->notes, 
-            ]
-     
-       ], 200);/*
-    }
-    
     /**
      * دالة التصعيد اليدوي: تنقل الشكوى للمستوى الإداري الأعلى (تعديل التدرج: من 1 إلى 2 ومن 2 إلى 3).
      */
@@ -250,7 +147,6 @@ class ComplaintProcessingController extends Controller
         $user     = $request->user();
         $complain = Complain::findOrFail($id);
 
-        // التأكد من أحقية التصعيد زمنياً ومنطقياً
         if (!$complain->canEscalate()) {
             return response()->json([
                 'success' => false,
@@ -273,7 +169,7 @@ class ComplaintProcessingController extends Controller
             'level'          => $nextLevel, // تحديث المستوى المطلوب للمعالجة
             'assigned_level' => $nextLevel,
             'assigned_at'    => now(), // تصفير العداد للمسؤول الجديد
-            'status'         => Complain::STATUS_PENDING, // تعود كأنها جديدة للمسؤول الأعلى
+            'status'         => Complain::STATUS_PENDING, 
         ]);
 
         Log::info("Complaint {$complain->complain_number} escalated to level {$nextLevel}");
@@ -289,7 +185,7 @@ class ComplaintProcessingController extends Controller
     }
 
     /**
-     * عرض تفاصيل الشكوى بالكامل (للموظف والأدمن).
+     * عرض تفاصيل الشكوى بالكامل 
      */
     public function getComplaintDetails(Request $request, $id): JsonResponse
     {
