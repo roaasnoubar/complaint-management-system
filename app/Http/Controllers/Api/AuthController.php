@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
-use App\Mail\OtpMail;               
+use App\Mail\OtpMail;             
 class AuthController extends Controller
 {
     
@@ -43,17 +43,23 @@ class AuthController extends Controller
             'is_banned'               => false,
             'false_complaints_count'  => 0,
         ]);
-
-        try {
+        Mail::to($user->email)->send(new OtpMail((string)$verificationCode, $user->name));
+        /*try {
             Mail::to($user->email)->send(new OtpMail((string)$verificationCode, $user->name));
         } catch (\Exception $e) {
             Log::error("Mail Error: " . $e->getMessage());
-        }
+        }*/
+        /*try {
+            \Mail::to($user->email)->send(new \App\Mail\OtpMail((string)$verificationCode, $user->name));
+            \Log::info("تم إرسال الإيميل للمستخدم: " . $user->email);
+        } catch (\Exception $e) {
+            \Log::error("فشل إرسال إيميل الـ OTP: " . $e->getMessage());
+        }*/
 
         return response()->json([
             'success' => true,
-            'message' => 'Registration successful. Please check your email for the verification code.',
-            'data'    => $user->load('role'),
+            'message' => 'Registration successful.',
+            'data'    => $user
         ], 201);
     }
 
@@ -65,11 +71,16 @@ class AuthController extends Controller
             'code'  => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)
-            ->where('verification_code', trim($request->code)) 
-            ->where('verification_expires_at', '>=', now()->subMinutes(2)) 
+        $user = User::where('email', trim($request->email))
+        ->where('verification_code', (string) $request->code)
+        ->where('verification_expires_at', '>=', now())
             ->first();
-            
+            \Log::info("التحقق من الكود:", [
+                'email_input' => $request->email,
+                'code_input' => $request->code,
+                'user_in_db' => $user ? 'موجود' : 'غير موجود',
+                'current_time' => now()
+            ]);
         if (!$user) {
             return response()->json([
                 'success' => false,

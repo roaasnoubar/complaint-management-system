@@ -38,21 +38,21 @@ class DashboardController extends Controller
      */
     public function complaintsByAuthority(): JsonResponse
     {
-        $data = DB::table('authorities')
-            ->leftJoin('complains', 'authorities.id', '=', 'complains.auth_id')
+        // 1. تعريف الاستعلام
+        $query = DB::table('authorities')
+            ->leftJoin('complains', 'authorities.id', '=', 'complains.authority_id') // تأكدي أن اسم العمود هو authority_id
             ->select('authorities.name', DB::raw('count(complains.id) as count'))
-            ->groupBy('authorities.id', 'authorities.name')
-            ->get();
-
+            ->groupBy('authorities.id', 'authorities.name');
+    
+        // 2. جلب النتائج
+        $data = $query->get();
+    
+        // 3. إرجاع النتائج
         return response()->json([
-            'success' => true, 
+            'success' => true,
             'data' => $data
         ]);
     }
-
-
-
-
     public function complaintsByDepartment(): JsonResponse
     {
         $data = DB::table('departments')
@@ -68,8 +68,6 @@ class DashboardController extends Controller
         ]);
     }
 
-    
-    
     public function monthlyComplaints(): JsonResponse
     {
         $data = DB::table('complains')

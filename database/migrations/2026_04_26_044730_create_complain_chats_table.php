@@ -14,7 +14,7 @@ return new class extends Migration
     Schema::create('complain_chats', function (Blueprint $table) {
         $table->id();
         $table->unsignedBigInteger('complain_id');
-        $table->unsignedBigInteger('user_id'); // المستخدم الذي فتح المحادثة
+        $table->unsignedBigInteger('user_id'); 
         $table->boolean('is_open')->default(true);
         $table->timestamps();
 

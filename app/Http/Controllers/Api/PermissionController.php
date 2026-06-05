@@ -9,9 +9,7 @@ use Illuminate\View\View;
 
 class PermissionController extends Controller
 {
-    /**
-     * Display a listing of permissions.
-     */
+   
     public function index(): View
     {
         $permissions = Permission::withCount('roles')->latest()->paginate(15);
@@ -19,17 +17,11 @@ class PermissionController extends Controller
         return view('permissions.index', compact('permissions'));
     }
 
-    /**
-     * Show the form for creating a permission.
-     */
     public function create(): View
     {
         return view('permissions.create');
     }
 
-    /**
-     * Store a newly created permission.
-     */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -43,9 +35,7 @@ class PermissionController extends Controller
             ->with('success', __('Permission created successfully.'));
     }
 
-    /**
-     * Display the specified permission.
-     */
+
     public function show(Permission $permission): View
     {
         $permission->load('roles');
@@ -53,17 +43,11 @@ class PermissionController extends Controller
         return view('permissions.show', compact('permission'));
     }
 
-    /**
-     * Show the form for editing the permission.
-     */
     public function edit(Permission $permission): View
     {
         return view('permissions.edit', compact('permission'));
     }
 
-    /**
-     * Update the specified permission.
-     */
     public function update(Request $request, Permission $permission): RedirectResponse
     {
         $validated = $request->validate([
@@ -77,9 +61,7 @@ class PermissionController extends Controller
             ->with('success', __('Permission updated successfully.'));
     }
 
-    /**
-     * Remove the specified permission.
-     */
+   
     public function destroy(Permission $permission): RedirectResponse
     {
         $permission->delete();

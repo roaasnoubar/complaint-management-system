@@ -27,13 +27,12 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => $email,
-            // توليد يوزر نيم تلقائي كما يفعل الكنترولر الخاص بكِ
             'username' => explode('@', $email)[0] . '_' . rand(100, 999), 
             'phone' => fake()->unique()->numerify('05########'),
             'birthdate' => fake()->date(),
             'password' => static::$password ??= Hash::make('password'),
             'is_verified' => true,
-            'role_id' => 3, // القيمة الافتراضية للمواطن
+            'role_id' => 3, 
             'authority_id' => 1,
             'remember_token' => Str::random(10),
         ];

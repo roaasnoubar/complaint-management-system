@@ -33,12 +33,21 @@ Route::get('/ping', function () {
     return response()->json(['status' => 'OK', 'message' => 'Server is running']);
 });
 
-
+Route::get('/debug-mail', function () {
+    try {
+        \Illuminate\Support\Facades\Mail::raw('تجربة إرسال إيميل', function ($message) {
+            $message->to('roaasnoubar12@gmail.com')->subject('اختبار إرسال');
+        });
+        return "تم الإرسال بنجاح!";
+    } catch (\Exception $e) {
+        return "الخطأ هو: " . $e->getMessage();
+    }
+});
 // انقليه إلى هنا (خارج الـ middleware) ليعمل في البوست مان بدون Token
 // -------------------------------------------------------------------------
 // مسار التصعيد التلقائي المطور (المصحح بالكامل بتوقيت دمشق وحالة Pending)
 // -------------------------------------------------------------------------
-Route::get('/escalate-complaints', function () {
+/*Route::get('/escalate-complaints', function () {
     $now = Carbon::now('Asia/Damascus');
     
     // نطرح دقيقة واحدة وثانية إضافية لضمان تخطي أي حماية للوقت والتقاط الشكوى المنتهية فوراً
@@ -111,7 +120,7 @@ Route::get('/escalate-complaints', function () {
         'current_time_damascus' => $now->format('Y-m-d H:i:s'),
         'total_count' => 0
     ], 200);
-});
+});*/
 
 /*
 |--------------------------------------------------------------------------
@@ -202,10 +211,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckEscalation::class])
             Route::post('/complaints/{id}/status', [ComplaintProcessingController::class, 'updateStatus']);
             Route::post('/complaints/{id}/reject', [ComplaintProcessingController::class, 'reject']);
         //});
+        Route::post('/complaints/{id}/rate', [RatingController::class, 'submitRating']);
 
-        Route::post('/complains/{id}/rate', [RatingController::class, 'submitRating']);
 
-        // رابط جلب تقييمات وتوزيع نجوم جهة معينة للـ Dashboard
         Route::get('/authorities/{id}/ratings', [RatingController::class, 'getAuthorityRatings']);
     });
     

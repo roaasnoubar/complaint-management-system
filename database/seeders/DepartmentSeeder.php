@@ -13,34 +13,6 @@ class DepartmentSeeder extends Seeder
      */
     public function run(): void
     {
-        // $authorities = Authority::all();
-
-        // $departments = [
-          //  ['Municipality' => ['Infrastructure', 'Sanitation', 'Urban Planning']],
-            //['Health Department' => ['Hospitals', 'Clinics', 'Emergency Services']],
-            //['Education Authority' => ['Schools', 'Universities', 'Training']],
-            //['Public Works' => ['Roads', 'Buildings', 'Utilities']],
-            //['Police Department' => ['Patrol', 'Investigations', 'Traffic']],
-        //];
-
-        //foreach ($departments as $deptGroup) {
-          //  foreach ($deptGroup as $authorityName => $deptNames) {
-            //    $authority = $authorities->firstWhere('name', $authorityName);
-              //  if ($authority) {
-                //    foreach ($deptNames as $deptName) {
-                  //      Department::updateOrCreate(
-                    //        [
-                      //          'authority_id' => $authority->id,
-                        //        'name' => $deptName,
-                          //  ],
-                            //[
-                              //  'description' => "Department of {$deptName} under {$authorityName}",
-                                //'is_active' => true,
-                            //]
-                        //);
-                    //}
-                //}
-            //}
-        //} 
+       
     }
 }

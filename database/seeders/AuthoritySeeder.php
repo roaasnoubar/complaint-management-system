@@ -37,13 +37,11 @@ class AuthoritySeeder extends Seeder
         ];
 
         foreach ($data as $authName => $departments) {
-            // 1. إنشاء أو تحديث الجهة (Authority)
             $authority = Authority::updateOrCreate(
                 ['name' => $authName],
                 ['description' => 'جهة رسمية تابعة لنظام إدارة الشكاوى']
             );
 
-            // 2. إضافة الأقسام (Departments) التابعة لهذه الجهة
             foreach ($departments as $deptName) {
                 Department::updateOrCreate(
                     [

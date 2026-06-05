@@ -47,7 +47,7 @@ class ComplaintProcessingController extends Controller
     {
         $user     = $request->user();
         $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
-     // 1. التحقق من الصلاحيات العامة (هل هو موظف، مدير، أو أدمن؟)
+     // 1. التحقق من الصلاحيات العامة 
         if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
         }
@@ -112,7 +112,6 @@ class ComplaintProcessingController extends Controller
     
     public function reject(Request $request, $id)
     {
-        // 1. تحديث الشكوى (بإمكانك استخدام Eloquent بدلاً من DB::statement ليكون الكود أنظف)
         $complain = \App\Models\Complain::find($id);
         if (!$complain) return response()->json(['message' => 'الشكوى غير موجودة'], 404);
     
@@ -121,7 +120,7 @@ class ComplaintProcessingController extends Controller
             'notes' => $request->rejection_reason ?? 'لا يوجد سبب'
         ]);
     
-        // 2. إنشاء الإشعار باستخدام الموديل (بدل DB::table)
+        // 2. إنشاء الإشعار باستخدام الموديل 
         $notification = \App\Models\Notification::create([
             'user_id'    => $complain->user_id,
             'title'      => 'تم رفض الشكوى',
@@ -130,19 +129,17 @@ class ComplaintProcessingController extends Controller
             'type'       => 'reject',
         ]);
     
-        // 3. الخطوة السحرية: إطلاق الحدث يدوياً لكي يصل الإشعار للموبايل فوراً
         event(new \App\Events\NotificationSent($notification));
     
         return response()->json(['message' => 'تم الرفض بنجاح وتم إرسال إشعار للمستخدم']);
-        $authority = \App\Models\Authority::find($complain->auth_id); // أو $complain->auth_id حسب عمودك
+        $authority = \App\Models\Authority::find($complain->auth_id); 
 if ($authority) {
-    // خصم 10 نقاط مثلاً من السكور الإجمالي أو المتوسط
+    
     $authority->decrement('total_score', 10); 
-    // ملاحظة: تأكدي من اسم العمود في جدول authorities
 }
     }
     /**
-     * دالة التصعيد اليدوي: تنقل الشكوى للمستوى الإداري الأعلى (تعديل التدرج: من 1 إلى 2 ومن 2 إلى 3).
+     * دالة التصعي).
      */
     public function escalate(Request $request, $id): JsonResponse
     {
@@ -156,10 +153,9 @@ if ($authority) {
             ], 422);
         }
 
-        // التدرج التلقائي الصاعد بناءً على التعديل الجديد للـ ليفل
         $nextLevel = match(intval($complain->assigned_level)) {
-            1 => 2, // من الموظف لمدير القسم
-            2 => 3, // من مدير القسم لمدير الجهة
+            1 => 2, 
+            2 => 3,
             default => null,
         };
 
@@ -168,9 +164,9 @@ if ($authority) {
         }
 
         $complain->update([
-            'level'          => $nextLevel, // تحديث المستوى المطلوب للمعالجة
+            'level'          => $nextLevel, 
             'assigned_level' => $nextLevel,
-            'assigned_at'    => now(), // تصفير العداد للمسؤول الجديد
+            'assigned_at'    => now(), 
             'status'         => Complain::STATUS_PENDING, 
         ]);
 

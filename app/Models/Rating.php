@@ -7,16 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Rating extends Model
 {
-    // ⚠️ التعديل السحري هنا: إضافة حرف t ليطابق اسم جدولكِ الحقيقي في قاعدة البيانات
     protected $table = 'ratings'; 
 
-    // الحقول المسموح بتعبئتها بأمان
     protected $fillable = [
-        'complain_id',
+    'complain_id',
     'user_id',
     'auth_id',
     'response_speed_score',
-    'rating', // أضيفي هذا السطر
+    'rating', 
     'comment',
     ];
 
@@ -34,7 +32,7 @@ class Rating extends Model
     }
 
     /**
-     * العلاقة: التقييم ينتمي إلى مستخدم (الطالب صاحب التقييم)
+     * االطالب صاحب التقييم
      */
     public function user(): BelongsTo
     {
@@ -42,7 +40,7 @@ class Rating extends Model
     }
 
     /**
-     * العلاقة: التقييم ينتمي إلى الجهة التي تم تقييمها
+     *التقييم ينتمي إلى الجهة التي تم تقييمها
      */
     public function authority(): BelongsTo
     {

@@ -11,7 +11,6 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // نتحقق أولاً إذا كان الجدول غير موجود، عندها نقوم بإنشائه
         if (!Schema::hasTable('personal_access_tokens')) {
             Schema::create('personal_access_tokens', function (Blueprint $table) {
                 $table->id();

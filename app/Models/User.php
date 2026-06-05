@@ -50,29 +50,23 @@ class User extends Authenticatable
         'password'                => 'hashed', 
     ];
 
-    
+    //دالة كلشي يخص السكور
     
     public function adjustScoreByValidity(bool $isValid): void
     {
         if ($isValid) {
-            // زيادة النقاط للشكاوى الصحيحة
             $this->increment('score', 10);
         } else {
-            // خصم نقاط للشكاوى الكاذبة وزيادة العداد
             $this->decrement('score', 20);
             $this->increment('false_complaints_count');
 
-            // تلقائياً: إذا وصلت الشكاوى الكاذبة لـ 3 يتم الحظر
             if ($this->false_complaints_count >= 3) {
                 $this->update(['is_banned' => true, 'is_active' => false]);
             }
         }
     }
 
-   
-    /**
-     * التحقق من الأدمن العام (الذي يملك صلاحيات النظام كاملة)
-     */
+
     public function isAdmin(): bool
     {
         if (!$this->role) return false;
@@ -85,7 +79,6 @@ class User extends Authenticatable
         return $this->role->name === 'authority_manager' || $this->role->level === 1;
     }
 
-    // هذه الدالة مهمة جداً لأن رسالة الخطأ تشير إليها بالاسم
     public function isAuthorityManager(): bool
     {
         return $this->isAdmin() || $this->isManager();
@@ -173,13 +166,12 @@ class User extends Authenticatable
         'is_read' => false,
     ]);
 
-    // إطلاق البث المباشر فوراً للمواطن
     event(new \App\Events\NotificationSent($notification));
 
     return $notification;
 }
 
-// ولا تنسي إضافة العلاقة التي تسمح بتخزين الإشعارات
+// بتخزين الإشعارات
 public function notifications(): HasMany
 {
     return $this->hasMany(Notification::class);

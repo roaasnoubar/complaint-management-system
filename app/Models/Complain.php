@@ -39,7 +39,6 @@ class Complain extends Model
         return $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
     }
 
-    // إضافة الحقول الوهمية للـ JSON لسهولة التعامل مع الأندرويد
     protected $appends = ['created_at_human', 'level_name', 'can_chat' , 'status_color'];
 
     protected $casts = [
@@ -64,42 +63,38 @@ class Complain extends Model
     ];
 
     /**
-     * دالة التحقق من صلاحية المراسلة (كاملة لكل المستويات)
+     *  التحقق من صلاحية المراسلة
      */
     public function canAccessChat($user): bool
     {
         if (!$user || !$user->role) {
             return false;
         }
-        // 1. إذا كانت الشكوى محلولة أو مرفوضة، يُغلق الشات للجميع
         if (in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_REJECTED])) {
             return false;
         }
 
-        // 2. صاحب الشكوى (Level 4 / User)
         if ($user->id === $this->user_id) {
             return true;
         }
 
-        // حساب الأيام منذ تاريخ الإسناد لهذا المستوى
         $minutes = $this->assigned_at ? $this->assigned_at->diffInMinutes(now()) : 0;        
         return match($user->role?->level) {
             3       => ($this->assigned_level == 3 && $minutes <= 1),
             2       => ($this->assigned_level == 2 && $minutes <= 1),
             1       => ($this->assigned_level == 1),
-            0       => true, // الأدمن غالباً له كامل الصلاحية
+            0       => true,
             default => false,
         };
     }
 
-    // Accessor لاستخدام الدالة في الـ API كحقل can_chat
     public function getCanChatAttribute(): bool
     {
         $user = auth()->user();
         if (!$user) return false;
 
         return $this->canAccessChat($user);
-    } // تأكدي أن هذا القوس يغلق الدالة هنا فقط
+    } 
 
     public function getCreatedAtHumanAttribute(): string
     {
@@ -190,7 +185,6 @@ class Complain extends Model
     }
     public function processor()
 {
-    // ربط الشكوى بالمستخدم الذي قام بالرد
     return $this->belongsTo(User::class, 'processed_by');
 }
 }

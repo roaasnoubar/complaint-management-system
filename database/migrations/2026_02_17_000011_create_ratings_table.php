@@ -12,7 +12,6 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // التحقق من عدم وجود الجدول قبل إنشائه لتجنب أخطاء تكرار الجدول في الاختبارات
         if (!Schema::hasTable('ratings')) {
             Schema::create('ratings', function (Blueprint $table) {
                 $table->id();
@@ -30,8 +29,7 @@ return new class extends Migration
                 $table->unique(['complain_id', 'user_id']);
                 $table->index('auth_id');
 
-                // إضافة القيود الخارجية (Foreign Keys) بشرط عدم كون المحرك هو SQLite
-                // لأن SQLite لا يدعم إضافة القيود بنفس الطريقة أثناء إنشاء الجدول في بعض الإصدارات
+             
                 if (DB::connection()->getDriverName() !== 'sqlite') {
                     $table->foreign('complain_id')->references('id')->on('complains')->onDelete('cascade');
                     $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');

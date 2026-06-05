@@ -19,7 +19,6 @@ class RoleSeeder extends Seeder
     ];
 
     foreach ($roles as $roleData) {
-        // قمنا بتخزين الكائن الناتج عن العملية في متغير اسمه $roleModel
         $roleModel = \App\Models\Role::updateOrCreate(
             ['id' => $roleData['id']], 
             [
@@ -28,7 +27,6 @@ class RoleSeeder extends Seeder
             ]
         );
 
-        // الآن نمرر الكائن (Model) وليس المصفوفة
         $this->assignPermissionsByRole($roleModel);
     }
 }

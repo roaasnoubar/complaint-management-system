@@ -64,17 +64,13 @@ $employee = $request->user();
 {
     $user = $request->user();
     
-    // التأكد من جلب الشكوى مع كافة العلاقات المطلوبة
     $complain = Complain::with(['user', 'authority', 'department', 'attachments', 'chat.messages.sender'])
                         ->findOrFail($id);
 
-    // الوصول للمستوى بشكل آمن (تأكدي أن علاقة role معرفة في موديل User)
     $userLevel = $user->role ? intval($user->role->level) : null;
 
-    // 1. منطق مدير الجهة (Level 1)
     if ($userLevel === 1) {
-        // المدير يتبع لجهة معينة ويجب أن يرى كل ما يخص هذه الجهة (authority_id)
-        // نستخدم == للمقارنة المرنة لتجنب مشاكل أنواع البيانات (String vs Integer)
+  
         if ($complain->authority_id != $user->authority_id) {
             return response()->json([
                 'success' => false, 
@@ -82,7 +78,6 @@ $employee = $request->user();
             ], 403);
         }
     } 
-    // 2. منطق الموظف أو مدير القسم (Levels 2, 3)
     else {
         // الموظف مقيد بالجهة والقسم معاً
         if ($complain->authority_id != $user->authority_id || $complain->department_id != $user->department_id) {
@@ -93,14 +88,13 @@ $employee = $request->user();
         }
     }
 
-    // إذا اجتاز التحقق، يتم إرجاع البيانات
     return response()->json([
         'success' => true, 
         'data' => $this->formatComplainResponse($complain, true)
     ], 200);
 }
     /**
-     * 3. دالة التنسيق الموحدة
+     * 3.  التنسيق 
      */
     private function formatComplainResponse($complain, $withFullDetails = false)
     {

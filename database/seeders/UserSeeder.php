@@ -34,10 +34,10 @@ class UserSeeder extends Seeder
                 'department_id' => null,
                 'password' => Hash::make('shsham2026'),
             ],
-            // المدراء
+
             [
                 'email' => 'exams_mgr@shsham.edu.sy',
-                'username' => 'exams_manager_shsham', // جعلناه فريداً لمنع الـ Duplicate
+                'username' => 'exams_manager_shsham', 
                 'name' => 'مدير دائرة الامتحانات',
                 'phone' => '+963921111111',
                 'role_id' => 3,
@@ -47,7 +47,7 @@ class UserSeeder extends Seeder
             ],
             [
                 'email' => 'transport_mgr@shsham.edu.sy',
-                'username' => 'transport_manager_shsham', // جعلناه فريداً لمنع الـ Duplicate
+                'username' => 'transport_manager_shsham', 
                 'name' => 'مدير قسم النقل',
                 'phone' => '+963922222222',
                 'role_id' => 3,
@@ -85,7 +85,7 @@ class UserSeeder extends Seeder
                 'department_id' => 5,
                 'password' => Hash::make('manager123'),
             ],
-            // الموظفون
+
             [
                 'email' => 'exams_emp@shsham.edu.sy',
                 'username' => 'exams_employee_shsham',
@@ -136,7 +136,7 @@ class UserSeeder extends Seeder
                 'department_id' => 5,
                 'password' => Hash::make('emp123'),
             ],
-            // الطالب التجريبي
+
             [
                 'email' => 'student_test@shsham.edu.sy',
                 'username' => 'rami_student_shsham',

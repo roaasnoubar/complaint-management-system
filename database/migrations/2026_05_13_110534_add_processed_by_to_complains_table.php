@@ -12,7 +12,6 @@ return new class extends Migration
     public function up(): void
 {
     Schema::table('complains', function (Blueprint $table) {
-        // إضافة العمود وربطه بجدول المستخدمين
         $table->unsignedBigInteger('processed_by')->nullable()->after('status');
         $table->foreign('processed_by')->references('id')->on('users')->onDelete('set null');
     });

@@ -29,21 +29,16 @@ class ComplainChat extends Model
     }
 
     /**
-     * العلاقة مع صاحب الشكوى (مقدم الشكوى)
+     * العلاقة مع صاحب الشكوى 
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * العلاقة مع الرسائل
-     * تنبيه: تأكدي أن اسم الموديل عندك هو ChatMessage 
-     * إذا كان لا يزال CantMessage اتركيها كما هي، لكن الأفضل برمجياً توحيدها.
-     */
+  
     public function messages(): HasMany
     {
-        // سأضع ChatMessage لأنه الاسم المعتمد في الكنترولر والميجريشن
         return $this->hasMany(ChatMessage::class, 'chat_id');
     }
 }

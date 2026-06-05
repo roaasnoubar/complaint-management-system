@@ -23,7 +23,7 @@ class ComplainResource extends JsonResource
         'description' => $this->description,
         'can_chat' => $this->can_chat,
         'resolved_at' => $this->resolved_at,
-        'user' => $this->whenLoaded('user'), // لضمان تحميل بيانات المستخدم
+        'user' => $this->whenLoaded('user'), 
     ];
 }
 }

@@ -12,7 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('complains', function (Blueprint $table) {
-            // نتحقق أولاً هل العمود موجود لتجنب أي خطأ
             if (!Schema::hasColumn('complains', 'notes')) {
                 $table->text('notes')->nullable();
             }

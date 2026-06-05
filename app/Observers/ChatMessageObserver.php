@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Models\ChatMessage;
 use App\Models\ComplainChat;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -11,68 +12,40 @@ class ChatMessageObserver
     public function __construct(private NotificationService $notificationService) {}
 
     /**
-     * Triggered when a new chat message is stored.
-     * Creates notifications for all participants except the sender.
-     *
-     * Works with both CantMessage (API) and ChatMessage (web) models.
+     * Triggered when a new chat message is created.
+     * Notifies the other party in the conversation (student ↔ employee).
      */
-    public function created($message): void
+    public function created(ChatMessage $message): void
     {
-        $senderId = $message->sender_id ?? null;
-        if (!$senderId) {
+        $chat     = ComplainChat::with('complain')->find($message->chat_id);
+        $complain = $chat?->complain;
+
+        if (! $complain) {
             return;
         }
 
-        $senderName = $message->sender?->name ?? 'Someone';
-
-        // Both CantMessage/ChatMessage define a `chat()` relation.
-        $chat = $message->chat()->with('complain')->first();
-        if (!$chat || !$chat->complain) {
+        $sender = User::find($message->sender_id);
+        if (! $sender) {
             return;
         }
 
-        $complainTitle = $chat->complain->title ?? '';
-        $complainDepartmentId = $chat->complain->department_id ?? null;
-        $complainOwnerId = $chat->complain->user_id ?? null;
-
-        $recipientIds = collect();
-
-        // Notify all participants that have a ComplainChat session for this complain.
-        $participantIds = ComplainChat::query()
-            ->where('complain_id', $chat->complain_id)
-            ->pluck('user_id')
-            ->unique()
-            ->values();
-
-        foreach ($participantIds as $recipientId) {
-            if ((int) $recipientId === (int) $senderId) {
-                continue;
-            }
-
-            $recipientIds->push((int) $recipientId);
+        // Determine recipient: if sender is the complaint owner, notify assigned employee(s), and vice versa
+        if ($message->sender_id === $complain->user_id) {
+            // Student sent message — notify employees in current department
+            $recipients = User::where('department_id', $complain->current_department_id ?? $complain->department_id)
+                ->where('user_id', '!=', $message->sender_id)
+                ->get();
+        } else {
+            // Employee sent message — notify the complaint owner
+            $recipients = User::where('user_id', $complain->user_id)->get();
         }
 
-        // Always notify the complain owner (if they're not the sender).
-        if ($complainOwnerId && (int) $complainOwnerId !== (int) $senderId) {
-            $recipientIds->push((int) $complainOwnerId);
+        foreach ($recipients as $recipient) {
+            $this->notificationService->newMessage(
+                $recipient->user_id,
+                $sender->name,
+                $complain->title
+            );
         }
-
-        // And notify employees in the complain department (if available).
-        if ($complainDepartmentId) {
-            $employeeIds = User::query()
-                ->where('department_id', $complainDepartmentId)
-                ->where('id', '!=', $senderId)
-                ->whereHas('role', fn ($q) => $q->where('name', 'employee'))
-                ->pluck('id');
-
-            $recipientIds = $recipientIds->merge($employeeIds);
-        }
-
-        $recipientIds
-            ->unique()
-            ->values()
-            ->each(function (int $recipientId) use ($senderName, $complainTitle) {
-                $this->notificationService->newMessage($recipientId, $senderName, $complainTitle);
-            });
     }
 }
