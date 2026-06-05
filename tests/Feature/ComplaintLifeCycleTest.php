@@ -91,7 +91,16 @@ class ComplaintLifeCycleTest extends TestCase
     #[Test]
     public function complaint_status_transitions_correctly()
     {
-        // تأكدي أن 'status' هنا يطابق أحد القيم المسموحة في قاعدة بياناتك (مثلاً new أو Pending)
+        // 1. إنشاء مستخدم "موظف" بدلاً من مواطن
+        $employeeRole = Role::firstOrCreate(['name' => 'employee'], ['level' => 3]);
+        
+        $employee = User::factory()->create([
+            'role_id' => $employeeRole->id,
+            'authority_id' => $this->authority->id,
+            'department_id' => $this->department->id, // يجب أن يكون في نفس القسم ليجتاز الشرط رقم 3
+        ]);
+    
+        // 2. إنشاء الشكوى (تأكدي أن الـ department_id يطابق قسم الموظف)
         $complaint = Complain::create([
             'complain_number' => 'CMP-' . uniqid(),
             'full_name' => 'Test Name',
@@ -101,14 +110,15 @@ class ComplaintLifeCycleTest extends TestCase
             'authority_id' => $this->authority->id,
             'department_id' => $this->department->id,
             'status' => 'Pending', 
-            'assigned_level' => 3
+            'level' => 2 // مستوى أقل من الموظف (الموظف مستواه 3) ليجتاز الشرط رقم 2
         ]);
-
-        $response = $this->actingAs($this->citizen, 'sanctum')
+    
+        // 3. تنفيذ الطلب باستخدام "الموظف"
+        $response = $this->actingAs($employee, 'sanctum')
             ->postJson("/api/complaints/{$complaint->id}/status", [
                 'status' => 'In Progress'
             ]);
-
+    
         $response->assertStatus(200);
         $this->assertEquals('In Progress', $complaint->fresh()->status);
     }

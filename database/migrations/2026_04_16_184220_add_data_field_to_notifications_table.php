@@ -9,8 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('notifications', function (Blueprint $table) {
-            // إضافة العمود يدوياً من هنا لضمان وصوله لقاعدة البيانات الصحيحة
-            $table->json('data')->after('type')->nullable();
+            // التحقق من وجود العمود قبل إضافته
+            if (!Schema::hasColumn('notifications', 'data')) {
+                $table->json('data')->nullable()->after('type');
+            }
         });
     }
 

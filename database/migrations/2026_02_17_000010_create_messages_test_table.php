@@ -9,13 +9,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // تعطيل فحص العلاقات مؤقتاً
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        // نتحقق من نوع قاعدة البيانات لضمان عدم تنفيذ الأمر على SQLite
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        }
 
         Schema::create('chat_messages', function (Blueprint $table) {
             $table->id();
             
-            // نستخدم النوع الخام لضمان التطابق مع الأنظمة القديمة والجديدة
             $table->unsignedBigInteger('chat_id')->index();
             $table->unsignedBigInteger('sender_id')->index();
 
@@ -26,13 +27,14 @@ return new class extends Migration
             $table->timestamp('sent_at')->useCurrent();
             $table->timestamps();
 
-            // إضافة الربط بشكل صريح
             $table->foreign('chat_id')->references('id')->on('complain_chats')->onDelete('cascade');
             $table->foreign('sender_id')->references('id')->on('users')->onDelete('cascade');
         });
 
-        // إعادة تفعيل فحص العلاقات
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        // إعادة التفعيل بنفس الشرط
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        }
     }
 
     public function down(): void

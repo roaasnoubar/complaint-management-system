@@ -1,12 +1,11 @@
 <?php
 
 namespace Tests\Unit;
-
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\Authority;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OtpMail;
 

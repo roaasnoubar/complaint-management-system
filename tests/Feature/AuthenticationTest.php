@@ -69,24 +69,23 @@ class AuthenticationTest extends TestCase
     }
 
     #[Test]
-    public function user_cannot_login_if_not_verified()
-    {
-        $user = User::factory()->create([
-            'username' => 'test_user_unique',
-            'email' => 'notverified@test.com',
-            'password' => bcrypt('password123'),
-            'is_verified' => false,
-            'role_id' => $this->role->id,
-            'authority_id' => $this->authority->id,
-        ]);
+public function user_cannot_login_if_not_verified()
+{
+    // بما أن الشرط في الـ Controller هو role_id == 5 للمواطن
+    $user = User::factory()->create([
+        'username' => 'test_user_unique',
+        'email' => 'notverified@test.com',
+        'password' => bcrypt('password123'),
+        'is_verified' => false,
+        'role_id' => 5, // <--- هذا هو الرقم الذي يفعّل شرط الـ Controller لديكِ
+        'authority_id' => $this->authority->id,
+    ]);
 
-        $response = $this->postJson('/api/auth/login', [
-            'username' => 'test_user_unique',
-            'password' => 'password123'
-        ]);
+    $response = $this->postJson('/api/auth/login', [
+        'username' => 'test_user_unique',
+        'password' => 'password123'
+    ]);
 
-        // تأكدي أن الـ Controller يرجع 403 أو 401 عند عدم التفعيل
-        // إذا فشل هنا، جربي تغيير assertStatus لـ 401 أو 422 حسب رد سيرفرك
-        $response->assertStatus(403); 
-    }
+    $response->assertStatus(403);
+}
 }

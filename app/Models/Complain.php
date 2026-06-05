@@ -26,6 +26,7 @@ class Complain extends Model
         'title',
         'description',
         'status',
+        'level',
         'is_valid',
         'assigned_level',
         'assigned_at',

@@ -53,8 +53,7 @@ class ComplaintProcessingController extends Controller
     {
         $user     = $request->user();
         $complain = Complain::with(['user', 'authority', 'department'])->findOrFail($id);
-
-        // 1. التحقق من الصلاحيات العامة (هل هو موظف، مدير، أو أدمن؟)
+     // 1. التحقق من الصلاحيات العامة (هل هو موظف، مدير، أو أدمن؟)
         if (!$user->isEmployee() && !$user->isAdmin() && !$user->isDeptManager() && !$user->isAuthorityManager()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized Access.'], 403);
         }
