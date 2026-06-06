@@ -11,7 +11,6 @@ use App\Mail\OtpMail;
 
 class UserAuthTest extends TestCase
 {
-    // هذه الخاصية ستقوم بتفريغ قاعدة البيانات وإعادة بنائها قبل كل اختبار لضمان بيئة نظيفة
     use RefreshDatabase;
 
     protected $role;
@@ -21,7 +20,6 @@ class UserAuthTest extends TestCase
     {
         parent::setUp();
         
-        // نستخدم firstOrCreate لنتجنب خطأ التكرار (Duplicate Entry)
         $this->role = Role::firstOrCreate(
             ['name' => 'user'],
             ['level' => 4]

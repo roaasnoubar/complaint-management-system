@@ -7,10 +7,7 @@ use Carbon\Carbon;
 
 class EscalationTest extends TestCase
 {
-    /**
-     * اختبار قاعدة الـ SLA (التصعيد التلقائي بعد دقيقة)
-     * هل النظام يحدد الشكوى كـ "متأخرة" بشكل صحيح؟
-     */
+    
     public function test_sla_time_limit_rule()
     {
         // ضبط وقت "دمشق" افتراضي للاختبار
@@ -29,13 +26,10 @@ class EscalationTest extends TestCase
         $this->assertTrue($isStillFresh, "يجب ألا يتم اعتبار الشكوى متأخرة قبل مرور دقيقة كاملة.");
     }
 
-    /**
-     * اختبار قاعدة الصلاحيات (Manual Escalation Rule)
-     * هل ليفل المستخدم يسمح له بالتصعيد؟
-     */
+    
     public function test_manual_escalation_permission_logic()
     {
-        // القواعد البرمجية (Business Rules)
+       
         $allowedLevels = [0, 2, 3]; // أدمن، مدير قسم، مدير جهة
         
         $employeeLevel = 1; // موظف عادي
@@ -48,17 +42,13 @@ class EscalationTest extends TestCase
         $this->assertTrue(in_array($managerLevel, $allowedLevels), "رئيس القسم ليفل 2 يملك صلاحية تصعيد يدوية.");
     }
 
-    /**
-     * اختبار قاعدة الهرمية (Escalation Direction)
-     * التأكد من أن التصعيد يتم دائماً للأعلى (رقم المستوى يتناقص)
-     */
+    
     public function test_escalation_must_be_to_higher_authority()
     {
         $currentLevel = 3; // موظف
         $targetLevel = 2;  // مدير قسم
         
-        // في نظامك: 1 هو الأعلى و 3 هو الأقل
-        // التصعيد الصحيح هو أن يكون target < current
+        
         $isUpward = $targetLevel < $currentLevel;
 
         $this->assertTrue($isUpward, "التصعيد يجب أن يتجه دائماً لمستوى إداري أعلى (رقم ليفل أقل).");

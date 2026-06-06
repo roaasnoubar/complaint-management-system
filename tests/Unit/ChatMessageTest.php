@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase; // لاحظي استخدام TestCase الأساسي ليكون اختبار وحدة حقيقي
+use PHPUnit\Framework\TestCase; 
 use App\Models\ChatMessage;
 
 class ChatMessageTest extends TestCase

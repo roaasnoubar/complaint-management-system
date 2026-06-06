@@ -44,18 +44,7 @@ class AuthController extends Controller
             'false_complaints_count'  => 0,
         ]);
         Mail::to($user->email)->send(new OtpMail((string)$verificationCode, $user->name));
-        /*try {
-            Mail::to($user->email)->send(new OtpMail((string)$verificationCode, $user->name));
-        } catch (\Exception $e) {
-            Log::error("Mail Error: " . $e->getMessage());
-        }*/
-        /*try {
-            \Mail::to($user->email)->send(new \App\Mail\OtpMail((string)$verificationCode, $user->name));
-            \Log::info("تم إرسال الإيميل للمستخدم: " . $user->email);
-        } catch (\Exception $e) {
-            \Log::error("فشل إرسال إيميل الـ OTP: " . $e->getMessage());
-        }*/
-
+       
         return response()->json([
             'success' => true,
             'message' => 'Registration successful.',
